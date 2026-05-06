@@ -69,6 +69,17 @@ class Scanner {
                     // You could throw an error here if you want
                 }
                 break;
+            case '/':
+                if (match('/')) {
+                    // Line comment: consume up to (but not including) the
+                    // newline. The '\n' case below handles the line counter.
+                    while (peek() != '\n' && !isAtEnd()) advance();
+                } else if (match('*')) {
+                    blockComment();
+                } else {
+                    System.err.println("Unexpected character: / at line " + line);
+                }
+                break;
             case ' ':
             case '\r':
             case '\t':
@@ -116,6 +127,21 @@ class Scanner {
 
         double value = Double.parseDouble(source.substring(start, current));
         addToken(TokenType.NUMBER, value);
+    }
+
+    private void blockComment() {
+        // Already past the opening "/*". Consume until we see "*/".
+        // Tracks newlines so the line counter stays accurate.
+        while (!isAtEnd()) {
+            if (peek() == '*' && peekNext() == '/') {
+                advance(); // consume '*'
+                advance(); // consume '/'
+                return;
+            }
+            if (peek() == '\n') line++;
+            advance();
+        }
+        System.err.println("Unterminated block comment starting near line " + line);
     }
 
     private boolean match(char expected) {
