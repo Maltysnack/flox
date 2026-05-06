@@ -1,8 +1,15 @@
+// A small two-source demo system.
+// Two upland creeks meet at a confluence and flow to an outlet.
 system Demo;
 
-Spring[2, 2.0, 0.7]    -> Confluence[3, 1.8];
-Tributary[1, 1.5, 0.6] -> Confluence[3, 1.8];
-Confluence[3, 1.8]     -> Outlet[];
+/* River params: [baseFlow, peakMultiplier, decayRate]
+   baseFlow is L/s with no rainfall.
+   peakMultiplier scales the rainfall surge.
+   decayRate is the fraction of the surge retained each subsequent day. */
+
+Spring[2, 2.0, 0.7]    -> Confluence[3, 1.8];   // upland creek
+Tributary[1, 1.5, 0.6] -> Confluence[3, 1.8];   // smaller side branch
+Confluence[3, 1.8]     -> Outlet[];             // empty brackets = outlet
 
 map Demo;
-print Demo 5;
+print Demo 5;   // simulate at 5mm of rainfall
