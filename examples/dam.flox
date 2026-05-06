@@ -1,0 +1,11 @@
+system Test;
+test[2, 2.0, 0.7] -> testDam{1000, 0.8, 1.2} -> testAgain[];
+
+system Trial;
+trial[2, 2.0, 0.7] -> trialDam{1000,40%, 0.8, 1.2} -> trialAgain[];
+
+print Test;
+print Trial;
+
+map Test;
+map Trial;

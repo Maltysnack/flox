@@ -1,0 +1,22 @@
+
+
+system Canberra;
+
+Googong[2, 2.0, 0.7] -> googongDam{1000, 0.8, 1.2} -> Queanbeyan[3, 1.5];
+
+
+jerrabombarra[2, 2.0] -> centralMongolo[];
+upperMongolo[3, 1.8, 0.6] -> Queanbeyan[3, 1.5];
+
+
+Queanbeyan[3, 1.5] -> centralMongolo[];
+centralMongolo[] -> burleyGriffinDam{5000, 60%, 0.9, 1.5} -> lowerMongolo[];
+
+list Canberra;
+map Canberra;
+
+
+print Canberra;
+print Canberra 5;
+print Canberra 10;
+

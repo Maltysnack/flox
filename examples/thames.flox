@@ -1,0 +1,18 @@
+system Thames;
+
+Churn[2, 2.5, 0.8] -> UpperThames[3, 2.0];
+Coln[1.5, 2.0, 0.75] -> UpperThames[3, 2.0];
+
+Cherwell[2.5, 2.2] -> UpperThames[3, 2.0];
+
+UpperThames[3, 2.0] -> MiddleThames[4, 1.8];
+
+Kennet[2, 1.8] -> MiddleThames[4, 1.8];
+
+MiddleThames[4, 1.8] -> LowerThames[3, 1.5];
+LowerThames[3, 1.5] -> ThamesEstuary[];
+
+list Thames;
+map Thames;
+print Thames 10;
+print Thames 25;

@@ -1,0 +1,12 @@
+system Devlins;
+
+Mahers[2,5] -> Joes[3,5];
+list Devlins;
+
+
+Joes[3,5] -> DevlinsCreek[];
+Bens[1,1] -> DevlinsCreek[];
+list Devlins;
+
+map Devlins;
+print Devlins;

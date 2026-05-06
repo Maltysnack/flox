@@ -1,0 +1,172 @@
+package flox;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+class Scanner {
+    private static final Map<String, TokenType> keywords;
+
+    static {
+        keywords = new HashMap<>();
+        keywords.put("system", TokenType.SYSTEM);
+        keywords.put("map", TokenType.MAP);
+        keywords.put("list", TokenType.LIST);
+        keywords.put("print", TokenType.PRINT);
+        keywords.put("help", TokenType.HELP);
+    }
+
+    private final String source;
+    private final List<Token> tokens = new ArrayList<>();
+    private int start = 0;
+    private int current = 0;
+    private int line = 1;
+
+    Scanner(String source) {
+        this.source = source;
+    }
+
+    List<Token> scanTokens() {
+        while (!isAtEnd()) {
+            start = current;
+            scanToken();
+        }
+
+        tokens.add(new Token(TokenType.EOF, "", null, line));
+        return tokens;
+    }
+
+    private void scanToken() {
+        char c = advance();
+        switch (c) {
+            // Removed all operators except ->, brackets, comma, semicolon
+            case '[':
+                addToken(TokenType.LEFT_BRACKET);
+                break;
+            case ']':
+                addToken(TokenType.RIGHT_BRACKET);
+                break;
+            case '{':
+                addToken(TokenType.LEFT_BRACE);
+                break;
+            case '}':
+                addToken(TokenType.RIGHT_BRACE);
+                break;
+            case ',':
+                addToken(TokenType.COMMA);
+                break;
+            case ';':
+                addToken(TokenType.SEMICOLON);
+                break;
+            case '%':
+                addToken(TokenType.PERCENT);
+                break;
+            case '-':
+                if (match('>')) {
+                    addToken(TokenType.ARROW);
+                } else {
+                    // You could throw an error here if you want
+                }
+                break;
+            case ' ':
+            case '\r':
+            case '\t':
+                // Ignore whitespace
+                break;
+            case '\n':
+                line++;
+                break;
+            default:
+                if (isDigit(c)) {
+                    number();
+                } else if (isAlpha(c)) {
+                    identifier();
+                } else {
+                    // Unknown character
+                    System.err.println("Unexpected character: " + c + " at line " + line);
+                }
+                break;
+        }
+    }
+
+    private void identifier() {
+        while (isAlphaNumeric(peek()))
+            advance();
+        String text = source.substring(start, current);
+
+        // Check if it's a keyword
+        TokenType type = keywords.get(text);
+        if (type == null)
+            type = TokenType.IDENTIFIER;
+
+        addToken(type, text);
+    }
+
+    private void number() {
+        while (isDigit(peek()))
+            advance();
+
+        // Optional fractional part
+        if (peek() == '.' && isDigit(peekNext())) {
+            advance(); // consume '.'
+            while (isDigit(peek()))
+                advance();
+        }
+
+        double value = Double.parseDouble(source.substring(start, current));
+        addToken(TokenType.NUMBER, value);
+    }
+
+    private boolean match(char expected) {
+        if (isAtEnd())
+            return false;
+        if (source.charAt(current) != expected)
+            return false;
+        current++;
+        return true;
+    }
+
+    private char peek() {
+        if (isAtEnd())
+            return '\0';
+        return source.charAt(current);
+    }
+
+    private char peekNext() {
+        if (current + 1 >= source.length())
+            return '\0';
+        return source.charAt(current + 1);
+    }
+
+    private boolean isAlpha(char c) {
+        return (c >= 'a' && c <= 'z') ||
+                (c >= 'A' && c <= 'Z');
+    }
+
+    private boolean isAlphaNumeric(char c) {
+        return isAlpha(c) || isDigit(c);
+    }
+
+    private boolean isDigit(char c) {
+        return c >= '0' && c <= '9';
+    }
+
+    private boolean isAtEnd() {
+        return current >= source.length();
+    }
+
+    private char advance() {
+        current++;
+        return source.charAt(current - 1);
+    }
+
+    private void addToken(TokenType type) {
+        addToken(type, null);
+    }
+
+    private void addToken(TokenType type, Object literal) {
+        String text = source.substring(start, current);
+        tokens.add(new Token(type, text, literal, line));
+    }
+}
