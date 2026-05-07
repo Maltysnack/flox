@@ -1,7 +1,9 @@
 package flox;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static flox.TokenType.*;
 
@@ -19,25 +21,23 @@ class Parser {
     List<Ast> parse() {
         List<Ast> statements = new ArrayList<>();
         while (!isAtEnd()) {
-            statements.add(declaration());
+            Ast stmt = declaration();
+            if (stmt != null) statements.add(stmt);
         }
         return statements;
     }
 
     private Ast declaration() {
         try {
-            if (match(SYSTEM))
-                return systemDeclaration();
-            if (match(MAP))
-                return mapStatement();
-            if (match(LIST))
-                return listStatement();
-            if (match(PRINT))
-                return printStatement();
-            if (match(HELP))
-                return helpStatement();
-
-            return riverChain();
+            if (match(SYSTEM))   return systemDeclaration();
+            if (match(RIVER))    return riverDeclaration();
+            if (match(DAM))      return damDeclaration();
+            if (match(OUTLET))   return outletDeclaration();
+            if (match(MAP))     return mapStatement();
+            if (match(LIST))     return listStatement();
+            if (match(PRINT))    return printStatement();
+            if (match(HELP))     return helpStatement();
+            return chain();
         } catch (ParseError error) {
             synchronize();
             return null;
@@ -82,85 +82,103 @@ class Parser {
         return new Ast.HelpStmt();
     }
 
-    // Googong[2, 2.0] -> dam1{...} -> Queanbeyan[3, 1.5];
-    private Ast riverChain() {
-        Ast expr = riverOrDam();
+    // river Spring { base: 2, peak: 2.0, decay: 0.7 }
+    private Ast riverDeclaration() {
+        Token name = consume(IDENTIFIER, "Expect river name.");
+        Map<String, Double> attrs = parseBlock(name);
+        consumeOptional(SEMICOLON);
 
-        while (match(ARROW)) {
-            Token operator = previous();
-            Ast right = riverOrDam();
-            expr = new Ast.Binary(expr, operator, right);
-        }
+        validateAttrs(name, attrs,
+                new String[] { "base", "peak" },
+                new String[] { "decay" });
 
-        consume(SEMICOLON, "Expect ';' after river chain.");
-        return expr;
+        double base  = attrs.get("base");
+        double peak  = attrs.get("peak");
+        double decay = attrs.getOrDefault("decay", 0.7);
+        return new Ast.River(name, base, peak, decay);
     }
 
-    private Ast riverOrDam() {
-        if (check(IDENTIFIER)) {
-            Token name = advance();
+    // dam googongDam { capacity: 1000, threshold: 80%, normalRate: 0.8, openRate: 1.2 }
+    private Ast damDeclaration() {
+        Token name = consume(IDENTIFIER, "Expect dam name.");
+        Map<String, Double> attrs = parseBlock(name);
+        consumeOptional(SEMICOLON);
 
-            // Check if it's a dam (ends with "Dam")
-            if (name.lexeme.endsWith("Dam")) {
-                return dam(name);
-            } else {
-                return river(name);
+        validateAttrs(name, attrs,
+                new String[] { "capacity", "threshold", "normalRate", "openRate" },
+                new String[] {});
+
+        double capacity   = attrs.get("capacity");
+        double threshold  = attrs.get("threshold");
+        double normalRate = attrs.get("normalRate");
+        double openRate   = attrs.get("openRate");
+        return new Ast.Dam(name, capacity, threshold, normalRate, openRate);
+    }
+
+    // outlet lowerMongolo;   or   outlet lowerMongolo {}
+    private Ast outletDeclaration() {
+        Token name = consume(IDENTIFIER, "Expect outlet name.");
+        if (check(LEFT_BRACE)) {
+            Map<String, Double> attrs = parseBlock(name);
+            if (!attrs.isEmpty()) {
+                throw error(name, "Outlet '" + name.lexeme + "' takes no attributes.");
             }
         }
-        throw error(peek(), "Expect river or dam name.");
+        consumeOptional(SEMICOLON);
+        return new Ast.Outlet(name);
     }
 
-    // Googong[2, 2.0] or Googong[2, 2.0, 0.6] or Googong[]
-    private Ast river(Token name) {
-        consume(LEFT_BRACKET, "Expect '[' after river name.");
-
-        // Check for empty terminator []
-        if (check(RIGHT_BRACKET)) {
-            consume(RIGHT_BRACKET, "Expect ']'.");
-            return new Ast.River(name, 0, 0, 0.7); // Terminator
+    // A chain is one or more bare identifiers joined by ->.
+    // A -> B -> C;
+    private Ast chain() {
+        if (!check(IDENTIFIER)) {
+            throw error(peek(), "Expect declaration or chain.");
         }
-
-        double baseFlow = consumeNumber("Expect base flow.");
-        consume(COMMA, "Expect ',' after base flow.");
-        double peakMultiplier = consumeNumber("Expect peak multiplier.");
-
-        double decayRate = 0.7; // default
-        if (match(COMMA)) {
-            decayRate = consumeNumber("Expect decay rate.");
+        List<Token> nodes = new ArrayList<>();
+        nodes.add(advance());
+        while (match(ARROW)) {
+            nodes.add(consume(IDENTIFIER, "Expect node name after '->'."));
         }
-
-        consume(RIGHT_BRACKET, "Expect ']' after river parameters.");
-        return new Ast.River(name, baseFlow, peakMultiplier, decayRate);
+        consume(SEMICOLON, "Expect ';' after chain.");
+        return new Ast.Chain(nodes);
     }
 
-    // googongDam{1000, 0.8, 1.2} or googongDam{1000, 70%, 0.8, 1.2}
-    private Ast dam(Token name) {
-        consume(LEFT_BRACE, "Expect '{' after dam name.");
-
-        double capacity = consumeNumber("Expect capacity.");
-        consume(COMMA, "Expect ',' after capacity.");
-
-        // Check if next is a threshold with %
-        double threshold = 0.8; // default 80%
-        double normalRate, openRate;
-
-        if (checkAhead(NUMBER, PERCENT)) {
-            // Format: {1000, 70%, 0.8, 1.2}
-            threshold = consumeNumber("Expect threshold.") / 100.0;
-            consume(PERCENT, "Expect '%' after threshold.");
-            consume(COMMA, "Expect ',' after threshold.");
-            normalRate = consumeNumber("Expect normal rate.");
-            consume(COMMA, "Expect ',' after normal rate.");
-            openRate = consumeNumber("Expect open rate.");
-        } else {
-            // Format: {1000, 0.8, 1.2} - no threshold specified
-            normalRate = consumeNumber("Expect normal rate.");
-            consume(COMMA, "Expect ',' after normal rate.");
-            openRate = consumeNumber("Expect open rate.");
+    // { key: value (, key: value)* }   ,/whitespace flexible, trailing comma allowed
+    // Threshold values may have a trailing % which divides by 100.
+    private Map<String, Double> parseBlock(Token declName) {
+        consume(LEFT_BRACE, "Expect '{' to open '" + declName.lexeme + "' attributes.");
+        Map<String, Double> attrs = new HashMap<>();
+        while (!check(RIGHT_BRACE) && !isAtEnd()) {
+            Token key = consume(IDENTIFIER, "Expect attribute name.");
+            consume(COLON, "Expect ':' after attribute name '" + key.lexeme + "'.");
+            double value = consumeNumber("Expect number after ':'.");
+            if (match(PERCENT)) value = value / 100.0;
+            if (attrs.containsKey(key.lexeme)) {
+                throw error(key, "Duplicate attribute '" + key.lexeme + "'.");
+            }
+            attrs.put(key.lexeme, value);
+            // Comma is optional between attributes; whitespace also fine.
+            match(COMMA);
         }
+        consume(RIGHT_BRACE, "Expect '}' to close attributes.");
+        return attrs;
+    }
 
-        consume(RIGHT_BRACE, "Expect '}' after dam parameters.");
-        return new Ast.Dam(name, capacity, threshold, normalRate, openRate);
+    private void validateAttrs(Token declName, Map<String, Double> attrs,
+                               String[] required, String[] optional) {
+        // Every key must be in required or optional.
+        outer: for (String key : attrs.keySet()) {
+            for (String r : required) if (key.equals(r)) continue outer;
+            for (String o : optional) if (key.equals(o)) continue outer;
+            throw error(declName, "Unknown attribute '" + key + "' on '" + declName.lexeme + "'.");
+        }
+        // Every required key must be present.
+        for (String r : required) {
+            if (!attrs.containsKey(r)) {
+                throw error(declName,
+                        "Missing required attribute '" + r + "' on '" + declName.lexeme + "'.");
+            }
+        }
     }
 
     private double consumeNumber(String message) {
@@ -168,16 +186,6 @@ class Parser {
             throw error(peek(), message);
         }
         return (Double) advance().literal;
-    }
-
-    private boolean checkAhead(TokenType first, TokenType second) {
-        if (isAtEnd())
-            return false;
-        if (tokens.get(current).type != first)
-            return false;
-        if (current + 1 >= tokens.size())
-            return false;
-        return tokens.get(current + 1).type == second;
     }
 
     private boolean match(TokenType... types) {
@@ -190,21 +198,22 @@ class Parser {
         return false;
     }
 
+    private void consumeOptional(TokenType type) {
+        if (check(type)) advance();
+    }
+
     private Token consume(TokenType type, String message) {
-        if (check(type))
-            return advance();
+        if (check(type)) return advance();
         throw error(peek(), message);
     }
 
     private boolean check(TokenType type) {
-        if (isAtEnd())
-            return false;
+        if (isAtEnd()) return false;
         return peek().type == type;
     }
 
     private Token advance() {
-        if (!isAtEnd())
-            current++;
+        if (!isAtEnd()) current++;
         return previous();
     }
 
@@ -228,13 +237,18 @@ class Parser {
     private void synchronize() {
         advance();
         while (!isAtEnd()) {
-            if (previous().type == SEMICOLON)
-                return;
+            if (previous().type == SEMICOLON) return;
             switch (peek().type) {
                 case SYSTEM:
+                case RIVER:
+                case DAM:
+                case OUTLET:
                 case MAP:
+                case LIST:
                 case PRINT:
                     return;
+                default:
+                    break;
             }
             advance();
         }

@@ -1,22 +1,31 @@
-
-
+// Canberra and surrounds: Googong, Queanbeyan, Molonglo, Burley Griffin.
 system Canberra;
 
-Googong[2, 2.0, 0.7] -> googongDam{1000, 0.8, 1.2} -> Queanbeyan[3, 1.5];
+// Network: chains read top to bottom like a map.
+Googong       -> googongDam       -> Queanbeyan -> centralMongolo;
+upperMongolo  -> Queanbeyan;
+jerrabombarra -> centralMongolo;
+centralMongolo -> burleyGriffinDam -> lowerMongolo;
 
+// Sources
+river Googong       { base: 2, peak: 2.0, decay: 0.7 }
+river upperMongolo  { base: 3, peak: 1.8, decay: 0.6 }
+river jerrabombarra { base: 2, peak: 2.0 }
 
-jerrabombarra[2, 2.0] -> centralMongolo[];
-upperMongolo[3, 1.8, 0.6] -> Queanbeyan[3, 1.5];
+// Mid-network rivers
+river Queanbeyan { base: 3, peak: 1.5 }
 
+// Dams
+dam googongDam       { capacity: 1000, threshold: 80%, normalRate: 0.8, openRate: 1.2 }
+dam burleyGriffinDam { capacity: 5000, threshold: 60%, normalRate: 0.9, openRate: 1.5 }
 
-Queanbeyan[3, 1.5] -> centralMongolo[];
-centralMongolo[] -> burleyGriffinDam{5000, 60%, 0.9, 1.5} -> lowerMongolo[];
+// Outlets
+outlet centralMongolo;
+outlet lowerMongolo;
 
 list Canberra;
-map Canberra;
-
+map  Canberra;
 
 print Canberra;
 print Canberra 5;
 print Canberra 10;
-

@@ -5,13 +5,15 @@ import java.util.List;
 abstract class Ast {
 
     public interface Visitor<R> {
-        R visitRiverExpr(River expr);
+        R visitSystemDecl(SystemDecl stmt);
 
-        R visitDamExpr(Dam expr);
+        R visitRiverDecl(River decl);
 
-        R visitBinaryExpr(Binary expr);
+        R visitDamDecl(Dam decl);
 
-        R visitSystemDeclStmt(SystemDecl stmt);
+        R visitOutletDecl(Outlet decl);
+
+        R visitChain(Chain chain);
 
         R visitMapStmt(MapStmt stmt);
 
@@ -24,12 +26,26 @@ abstract class Ast {
 
     public abstract <R> R accept(Visitor<R> visitor);
 
-    // River: Googong[2, 2.0, 0.7]
+    // system Canberra;
+    public static class SystemDecl extends Ast {
+        public final Token name;
+
+        public SystemDecl(Token name) {
+            this.name = name;
+        }
+
+        @Override
+        public <R> R accept(Visitor<R> visitor) {
+            return visitor.visitSystemDecl(this);
+        }
+    }
+
+    // river Spring { base: 2, peak: 2.0, decay: 0.7 }
     public static class River extends Ast {
         public final Token name;
         public final double baseFlow;
         public final double peakMultiplier;
-        public final double decayRate; // optional, defaults to 0.7
+        public final double decayRate;
 
         public River(Token name, double baseFlow, double peakMultiplier, double decayRate) {
             this.name = name;
@@ -40,15 +56,15 @@ abstract class Ast {
 
         @Override
         public <R> R accept(Visitor<R> visitor) {
-            return visitor.visitRiverExpr(this);
+            return visitor.visitRiverDecl(this);
         }
     }
 
-    // Dam: googongDam{1000, 0.8, 1.2} or googongDam{1000, 70%, 0.8, 1.2}
+    // dam googongDam { capacity: 1000, threshold: 80%, normalRate: 0.8, openRate: 1.2 }
     public static class Dam extends Ast {
         public final Token name;
         public final double capacity;
-        public final double threshold; // as decimal: 0.8 = 80%
+        public final double threshold; // as fraction: 0.8 = 80%
         public final double normalRate;
         public final double openRate;
 
@@ -62,43 +78,39 @@ abstract class Ast {
 
         @Override
         public <R> R accept(Visitor<R> visitor) {
-            return visitor.visitDamExpr(this);
+            return visitor.visitDamDecl(this);
         }
     }
 
-    // Binary: river1 -> river2
-    public static class Binary extends Ast {
-        public final Ast left;
-        public final Token operator;
-        public final Ast right;
-
-        public Binary(Ast left, Token operator, Ast right) {
-            this.left = left;
-            this.operator = operator;
-            this.right = right;
-        }
-
-        @Override
-        public <R> R accept(Visitor<R> visitor) {
-            return visitor.visitBinaryExpr(this);
-        }
-    }
-
-    // SystemDecl: system Canberra;
-    public static class SystemDecl extends Ast {
+    // outlet lowerMongolo;
+    public static class Outlet extends Ast {
         public final Token name;
 
-        public SystemDecl(Token name) {
+        public Outlet(Token name) {
             this.name = name;
         }
 
         @Override
         public <R> R accept(Visitor<R> visitor) {
-            return visitor.visitSystemDeclStmt(this);
+            return visitor.visitOutletDecl(this);
         }
     }
 
-    // MapStmt: map Canberra;
+    // A -> B -> C;  (pure references)
+    public static class Chain extends Ast {
+        public final List<Token> nodes;
+
+        public Chain(List<Token> nodes) {
+            this.nodes = nodes;
+        }
+
+        @Override
+        public <R> R accept(Visitor<R> visitor) {
+            return visitor.visitChain(this);
+        }
+    }
+
+    // map Canberra;
     public static class MapStmt extends Ast {
         public final Token systemName;
 
@@ -112,7 +124,7 @@ abstract class Ast {
         }
     }
 
-    // ListStmt: list Canberra;
+    // list Canberra;
     public static class ListStmt extends Ast {
         public final Token systemName;
 
@@ -126,7 +138,7 @@ abstract class Ast {
         }
     }
 
-    // PrintStmt: print Canberra; or print Canberra 5;
+    // print Canberra; or print Canberra 5;
     public static class PrintStmt extends Ast {
         public final Token systemName;
         public final Double rainfall; // null means default (1mm)
@@ -142,7 +154,7 @@ abstract class Ast {
         }
     }
 
-    // HelpStmt: help;
+    // help;
     public static class HelpStmt extends Ast {
         @Override
         public <R> R accept(Visitor<R> visitor) {

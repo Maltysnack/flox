@@ -15,6 +15,9 @@ class Scanner {
         keywords.put("list", TokenType.LIST);
         keywords.put("print", TokenType.PRINT);
         keywords.put("help", TokenType.HELP);
+        keywords.put("river", TokenType.RIVER);
+        keywords.put("dam", TokenType.DAM);
+        keywords.put("outlet", TokenType.OUTLET);
     }
 
     private final String source;
@@ -61,6 +64,9 @@ class Scanner {
                 break;
             case '%':
                 addToken(TokenType.PERCENT);
+                break;
+            case ':':
+                addToken(TokenType.COLON);
                 break;
             case '-':
                 if (match('>')) {

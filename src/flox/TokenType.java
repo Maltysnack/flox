@@ -3,7 +3,7 @@ package flox;
 enum TokenType {
     // Single-character tokens.
     SEMICOLON, LEFT_BRACKET, RIGHT_BRACKET, COMMA,
-    LEFT_BRACE, RIGHT_BRACE, PERCENT,
+    LEFT_BRACE, RIGHT_BRACE, PERCENT, COLON,
 
     // One or two character tokens.
     ARROW,
@@ -13,6 +13,7 @@ enum TokenType {
 
     // Keywords.
     SYSTEM, MAP, LIST, PRINT, HELP,
+    RIVER, DAM, OUTLET,
 
     EOF
 }

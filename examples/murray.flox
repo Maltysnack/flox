@@ -1,14 +1,22 @@
+// Murray-Darling: three major tributaries feeding the Murray, then the mouth.
 system MurrayDarling;
 
-UpperMurray[5, 3.0, 0.8] -> HumeDam{4500000, 75%, 0.85, 1.3} -> Murray[8, 2.5];
+UpperMurray  -> HumeDam       -> Murray;
+Murrumbidgee -> BurrinjuckDam -> MurrumbidgeeDownstream -> Murray;
+Darling      -> Murray;
+Murray       -> LowerMurray   -> MurrayMouth;
 
-Murrumbidgee[4, 2.8, 0.75] -> BurrinjuckDam{1026000, 70%, 0.8, 1.2} -> MurrumbidgeeDownstream[3, 2.0];
-MurrumbidgeeDownstream[3, 2.0] -> Murray[8, 2.5];
+river UpperMurray            { base: 5, peak: 3.0, decay: 0.8 }
+river Murrumbidgee           { base: 4, peak: 2.8, decay: 0.75 }
+river MurrumbidgeeDownstream { base: 3, peak: 2.0 }
+river Darling                { base: 6, peak: 3.5, decay: 0.7 }
+river Murray                 { base: 8, peak: 2.5 }
+river LowerMurray            { base: 4, peak: 1.5 }
 
-Darling[6, 3.5, 0.7] -> Murray[8, 2.5];
+dam HumeDam       { capacity: 4500000, threshold: 75%, normalRate: 0.85, openRate: 1.3 }
+dam BurrinjuckDam { capacity: 1026000, threshold: 70%, normalRate: 0.8,  openRate: 1.2 }
 
-Murray[8, 2.5] -> LowerMurray[4, 1.5];
-LowerMurray[4, 1.5] -> MurrayMouth[];
+outlet MurrayMouth;
 
 map MurrayDarling;
 print MurrayDarling 5;

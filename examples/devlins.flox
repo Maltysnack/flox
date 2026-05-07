@@ -1,12 +1,14 @@
+// Devlins Creek catchment: two tributaries meeting Joes, then the outlet.
 system Devlins;
 
-Mahers[2,5] -> Joes[3,5];
+Mahers -> Joes -> DevlinsCreek;
+Bens   -> DevlinsCreek;
+
+river Mahers { base: 2, peak: 5 }
+river Joes   { base: 3, peak: 5 }
+river Bens   { base: 1, peak: 1 }
+outlet DevlinsCreek;
+
 list Devlins;
-
-
-Joes[3,5] -> DevlinsCreek[];
-Bens[1,1] -> DevlinsCreek[];
-list Devlins;
-
 map Devlins;
 print Devlins;

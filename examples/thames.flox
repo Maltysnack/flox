@@ -1,16 +1,21 @@
+// Thames: four headwaters into the Upper Thames, joined by the Kennet,
+// then through the Middle and Lower reaches to the estuary.
 system Thames;
 
-Churn[2, 2.5, 0.8] -> UpperThames[3, 2.0];
-Coln[1.5, 2.0, 0.75] -> UpperThames[3, 2.0];
+Churn    -> UpperThames -> MiddleThames -> LowerThames -> ThamesEstuary;
+Coln     -> UpperThames;
+Cherwell -> UpperThames;
+Kennet   -> MiddleThames;
 
-Cherwell[2.5, 2.2] -> UpperThames[3, 2.0];
+river Churn        { base: 2,   peak: 2.5, decay: 0.8 }
+river Coln         { base: 1.5, peak: 2.0, decay: 0.75 }
+river Cherwell     { base: 2.5, peak: 2.2 }
+river Kennet       { base: 2,   peak: 1.8 }
+river UpperThames  { base: 3,   peak: 2.0 }
+river MiddleThames { base: 4,   peak: 1.8 }
+river LowerThames  { base: 3,   peak: 1.5 }
 
-UpperThames[3, 2.0] -> MiddleThames[4, 1.8];
-
-Kennet[2, 1.8] -> MiddleThames[4, 1.8];
-
-MiddleThames[4, 1.8] -> LowerThames[3, 1.5];
-LowerThames[3, 1.5] -> ThamesEstuary[];
+outlet ThamesEstuary;
 
 list Thames;
 map Thames;

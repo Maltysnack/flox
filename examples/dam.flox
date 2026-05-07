@@ -1,8 +1,21 @@
+// Two tiny systems exercising dam thresholds at different settings.
 system Test;
-test[2, 2.0, 0.7] -> testDam{1000, 0.8, 1.2} -> testAgain[];
+
+test -> testDam -> testAgain;
+
+river  test     { base: 2, peak: 2.0, decay: 0.7 }
+dam    testDam  { capacity: 1000, threshold: 80%, normalRate: 0.8, openRate: 1.2 }
+outlet testAgain;
+
 
 system Trial;
-trial[2, 2.0, 0.7] -> trialDam{1000,40%, 0.8, 1.2} -> trialAgain[];
+
+trial -> trialDam -> trialAgain;
+
+river  trial      { base: 2, peak: 2.0, decay: 0.7 }
+dam    trialDam   { capacity: 1000, threshold: 40%, normalRate: 0.8, openRate: 1.2 }
+outlet trialAgain;
+
 
 print Test;
 print Trial;

@@ -2,14 +2,20 @@
 // Two upland creeks meet at a confluence and flow to an outlet.
 system Demo;
 
-/* River params: [baseFlow, peakMultiplier, decayRate]
-   baseFlow is L/s with no rainfall.
-   peakMultiplier scales the rainfall surge.
-   decayRate is the fraction of the surge retained each subsequent day. */
+// Chains: pure references, so the network shape reads at a glance.
+Spring    -> Confluence -> Outlet;
+Tributary -> Confluence;
 
-Spring[2, 2.0, 0.7]    -> Confluence[3, 1.8];   // upland creek
-Tributary[1, 1.5, 0.6] -> Confluence[3, 1.8];   // smaller side branch
-Confluence[3, 1.8]     -> Outlet[];             // empty brackets = outlet
+/* Declarations: rich blocks, order doesn't matter.
+   River params:
+     base  - baseline flow (L/s) with no rainfall
+     peak  - multiplier on rainfall (mm) for the peak surge
+     decay - fraction of the surge retained each subsequent day */
+
+river  Spring     { base: 2, peak: 2.0, decay: 0.7 }
+river  Tributary  { base: 1, peak: 1.5, decay: 0.6 }
+river  Confluence { base: 3, peak: 1.8 }
+outlet Outlet;
 
 map Demo;
 print Demo 5;   // simulate at 5mm of rainfall
