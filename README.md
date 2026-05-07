@@ -21,22 +21,27 @@ the cumulative volume at each outlet.
 ## A taste
 
 ```flox
-system Canberra;
+system Demo;
 
-Googong[2, 2.0, 0.7] -> googongDam{1000, 80%, 0.8, 1.2} -> Queanbeyan[3, 1.5];
-upperMongolo[3, 1.8, 0.6] -> Queanbeyan[3, 1.5];
-Queanbeyan[3, 1.5] -> centralMongolo[];
-centralMongolo[] -> burleyGriffinDam{5000, 60%, 0.9, 1.5} -> lowerMongolo[];
+// Chains: the network shape, top to bottom.
+Spring    -> Confluence -> Outlet;
+Tributary -> Confluence;
 
-map Canberra;
-print Canberra 10;   // simulate 10 days
+// Declarations: rich blocks, source order doesn't matter.
+river  Spring     { base: 2, peak: 2.0, decay: 0.7 }
+river  Tributary  { base: 1, peak: 1.5, decay: 0.6 }
+river  Confluence { base: 3, peak: 1.8 }
+outlet Outlet;
+
+map Demo;
+print Demo 5;   // simulate at 5mm rainfall
 ```
 
-- `River[baseFlow, peakMultiplier, decayRate]`: a river segment.
-- `Dam{capacity, threshold, normalRate, openRate}`: a dam.
-- `->`: water flows from left to right.
-- `[]`: a terminator (outlet to ocean or downstream-of-interest).
-- Top-level verbs: `system`, `list`, `map`, `print`.
+- `river Name { base: ..., peak: ..., decay: ... }`: a river segment.
+- `dam Name { capacity: ..., threshold: ..., normalRate: ..., openRate: ... }`: a dam.
+- `outlet Name;`: a zero-flow accumulator.
+- `->`: directed flow, left to right.
+- Top-level verbs: `system`, `river`, `dam`, `outlet`, `list`, `map`, `print`.
 
 See `docs/grammar.md` for the full grammar and `examples/` for more programs.
 
@@ -56,5 +61,4 @@ Working: parser, AST, tree-walking interpreter, river hydrograph simulation,
 network visualisation, multi-day flow tables.
 
 Known limitations the roadmap addresses: dam storage dynamics are stubbed
-(units bug, see `ROADMAP.md`), positional parameters only, single-direction
-flow, river preset only.
+(units bug, see `ROADMAP.md`), single-direction flow, river preset only.
