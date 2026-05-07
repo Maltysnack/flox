@@ -6,21 +6,50 @@ milestone before it.
 
 The guiding north star: **Flox should be a flow-network DSL where rivers
 are one mode and Markov chains, traffic, and other compartmental models are
-others — same parser, same engine, different presets.**
+others. Same parser, same engine, different presets.**
 
 ---
 
-## Milestone 1 — Harden what's here
+## Milestone 1: Harden what's here
 
 Small fixes that make the current river language solid before extending it.
 
-- [ ] `// line comments` and `/* block comments */` in the scanner.
-- [ ] Named parameters: `Wollondilly[base: 4, peak: 2.5, decay: 0.6]`.
-      Positional still allowed for terseness.
-- [ ] Declare-once / reference-by-name: define each river at the top, then
-      reference by bare identifier in chains. Eliminates the "redeclare every
-      time you connect it" footgun.
-- [ ] Fix the dam units bug. Inflow is L/s, currentLevel is ML — they get
+- [x] `// line comments` and `/* block comments */` in the scanner.
+- [ ] **Language redesign: declarative blocks + chain-first programs.**
+      Replace inline positional/curly parameters with top-level node
+      declarations and chains-of-bare-references. Programs read chains-first
+      so the network shape is visible at a glance; declarations live below as
+      reference material. Subsumes the old "named parameters" and
+      "declare-once / reference-by-name" items.
+
+      ```flox
+      system Canberra;
+
+      Googong -> googongDam -> Queanbeyan -> centralMongolo;
+
+      river Googong     { base: 2, peak: 2.0, decay: 0.7 }
+      river Queanbeyan  { base: 3, peak: 1.5 }
+      dam   googongDam  { capacity: 1000, threshold: 80%,
+                          normalRate: 0.8, openRate: 1.2 }
+      outlet centralMongolo
+      ```
+
+      Sub-tasks:
+      - [ ] New keywords: `river`, `dam`, `outlet`.
+      - [ ] Block syntax `name: value` with commas or newlines as separators.
+            Single-line and multi-line forms both legal.
+      - [ ] Chains become pure references. No inline parameters.
+      - [ ] Two-pass interpreter. Pass 1 collects node declarations into a
+            symbol table. Pass 2 walks chains and resolves bare names. Error
+            if a chain references an undeclared node; warn if a node is
+            declared but never connected.
+      - [ ] Error messages point at both sites (the chain reference and the
+            (missing or stray) declaration).
+      - [ ] Migrate every program in `examples/` to the new grammar.
+      - [ ] Rewrite `docs/grammar.md` and the public grammar reference
+            (`maltysnack-site/projects/flox/docs/grammar.html`) to match.
+
+- [ ] Fix the dam units bug. Inflow is L/s, currentLevel is ML; they get
       added together. Convert with `inflow_L_per_s * 0.0864 = ML/day` before
       mutating the level. With this fixed, `threshold` and `openRate` actually
       do something.
@@ -30,7 +59,7 @@ Small fixes that make the current river language solid before extending it.
       and a shell script that diffs them. Catches regressions when the engine
       is generalised in M3.
 
-## Milestone 2 — TypeScript port + browser playground
+## Milestone 2: TypeScript port + browser playground
 
 The thing that takes Flox from "thing on disk" to "thing on a website."
 
@@ -43,7 +72,7 @@ The thing that takes Flox from "thing on disk" to "thing on a website."
 - [ ] Permalinks: program encoded in URL hash so you can share a Flox
       program by sending a link.
 
-## Milestone 3 — Generalise the engine: `mode` switch
+## Milestone 3: Generalise the engine with a `mode` switch
 
 The unlocking move. Instead of one tick rule, the engine becomes a graph
 simulator parameterised by a tick function.
@@ -57,7 +86,7 @@ simulator parameterised by a tick function.
       - `state` instead of `river` (or just keep `river`-but-meaningless).
       - `start NodeName 1.0;` to set initial distribution.
       - Tick: each node redistributes its current mass per outgoing weights.
-      - Convergence detection — print steady-state distribution.
+      - Convergence detection: print steady-state distribution.
 
 Demo to ship alongside this milestone:
 ```flox
@@ -73,7 +102,7 @@ start A 1.0;
 print PageRank 30;
 ```
 
-## Milestone 4 — 3D rendering
+## Milestone 4: 3D rendering
 
 You asked for it. Procedural / random visualisation of the network in 3D.
 
@@ -86,15 +115,15 @@ You asked for it. Procedural / random visualisation of the network in 3D.
 - [ ] Markov-mode rendering: nodes as spheres in 3D space, edges as
       animated particles whose density encodes weight.
 
-## Milestone 5 — More modes
+## Milestone 5: More modes
 
 Once the engine generalisation in M3 is stable, each new mode is a
 small addition: a node type, a tick rule, a printer.
 
-- [ ] `mode traffic` — intersections + roads + arrival rate.
-- [ ] `mode sir` — epidemic compartmental model.
-- [ ] `mode supply` — factories → warehouses → stores.
-- [ ] `mode plumbing` — bidirectional pressure-driven flow.
+- [ ] `mode traffic`: intersections, roads, arrival rate.
+- [ ] `mode sir`: epidemic compartmental model.
+- [ ] `mode supply`: factories &rarr; warehouses &rarr; stores.
+- [ ] `mode plumbing`: bidirectional pressure-driven flow.
 
 Each should ship with one canonical example and a writeup on the project
 website.

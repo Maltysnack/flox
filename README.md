@@ -5,8 +5,8 @@ how stuff moves through them over time.
 
 Today, Flox models river systems: rivers and dams connected by a `->` operator,
 driven by a daily rainfall signal. The same engine is being generalised so the
-same syntax can express other flow networks — Markov chains, traffic, supply
-chains, drainage — by switching modes.
+same syntax can express other flow networks (Markov chains, traffic, supply
+chains, drainage) by switching modes.
 
 ## Quick start
 
@@ -32,10 +32,10 @@ map Canberra;
 print Canberra 10;   // simulate 10 days
 ```
 
-- `River[baseFlow, peakMultiplier, decayRate]` — a river segment.
-- `Dam{capacity, threshold, normalRate, openRate}` — a dam.
-- `->` — water flows from left to right.
-- `[]` — a terminator (outlet to ocean / downstream-of-interest).
+- `River[baseFlow, peakMultiplier, decayRate]`: a river segment.
+- `Dam{capacity, threshold, normalRate, openRate}`: a dam.
+- `->`: water flows from left to right.
+- `[]`: a terminator (outlet to ocean or downstream-of-interest).
 - Top-level verbs: `system`, `list`, `map`, `print`.
 
 See `docs/grammar.md` for the full grammar and `examples/` for more programs.
@@ -56,5 +56,5 @@ Working: parser, AST, tree-walking interpreter, river hydrograph simulation,
 network visualisation, multi-day flow tables.
 
 Known limitations the roadmap addresses: dam storage dynamics are stubbed
-(units bug — see `ROADMAP.md`), no comments, positional parameters only,
-single-direction flow, river preset only.
+(units bug, see `ROADMAP.md`), positional parameters only, single-direction
+flow, river preset only.
