@@ -6,7 +6,7 @@ class RiverSystem {
     final String name;
     Map<String, River> rivers = new LinkedHashMap<>();
     Map<String, Dam> dams = new LinkedHashMap<>();
-    Map<String, List<String>> connections = new HashMap<>(); // name -> downstream names
+    Map<String, List<String>> connections = new LinkedHashMap<>(); // name -> downstream names; insertion-ordered for stable output
     List<String> roots = new ArrayList<>(); // Rivers with no upstream
 
     RiverSystem(String name) {
@@ -26,23 +26,17 @@ class RiverSystem {
     }
 
     void identifyRoots() {
-        roots.clear(); // Clear previous roots to prevent duplicates
-
-        Set<String> allNodes = new HashSet<>();
-        allNodes.addAll(rivers.keySet());
-        allNodes.addAll(dams.keySet());
-
+        roots.clear();
         Set<String> hasUpstream = new HashSet<>();
         for (List<String> downstream : connections.values()) {
             hasUpstream.addAll(downstream);
         }
-
-        for (String node : allNodes) {
-            if (!hasUpstream.contains(node)) {
-                River r = rivers.get(node);
-                if (r != null && !r.isTerminator()) {
-                    roots.add(node);
-                }
+        // Iterate rivers in declaration (insertion) order. Dams and outlets
+        // are excluded as roots: dams always have an upstream, outlets are
+        // terminators.
+        for (River r : rivers.values()) {
+            if (!hasUpstream.contains(r.name) && !r.isTerminator()) {
+                roots.add(r.name);
             }
         }
     }

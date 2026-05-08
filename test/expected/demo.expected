@@ -1,11 +1,11 @@
 
 === RIVER SYSTEM MAP: Demo ===
 
-Tributary (source)
+Spring (source)
   └──▶ Confluence
     └──▶ Outlet [OUTLET]
 
-Spring (source)
+Tributary (source)
   └──▶ Confluence
     └──▶ Outlet [OUTLET]
 

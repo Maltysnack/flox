@@ -1,0 +1,292 @@
+// Parser. Mechanical port of Parser.java.
+
+import {
+  AstNode,
+  Chain,
+  DamDecl,
+  HelpStmt,
+  ListStmt,
+  MapStmt,
+  OutletDecl,
+  PrintStmt,
+  RiverDecl,
+  SystemDecl,
+} from "./ast.ts";
+import { Token, TokenType } from "./token.ts";
+
+class ParseError extends Error {}
+
+export class Parser {
+  private current = 0;
+
+  constructor(
+    private readonly tokens: Token[],
+    private readonly errs: string[],
+  ) {}
+
+  parse(): AstNode[] {
+    const statements: AstNode[] = [];
+    while (!this.isAtEnd()) {
+      const stmt = this.declaration();
+      if (stmt !== null) statements.push(stmt);
+    }
+    return statements;
+  }
+
+  private declaration(): AstNode | null {
+    try {
+      if (this.match(TokenType.SYSTEM)) return this.systemDeclaration();
+      if (this.match(TokenType.RIVER))  return this.riverDeclaration();
+      if (this.match(TokenType.DAM))    return this.damDeclaration();
+      if (this.match(TokenType.OUTLET)) return this.outletDeclaration();
+      if (this.match(TokenType.MAP))    return this.mapStatement();
+      if (this.match(TokenType.LIST))   return this.listStatement();
+      if (this.match(TokenType.PRINT))  return this.printStatement();
+      if (this.match(TokenType.HELP))   return this.helpStatement();
+      return this.chain();
+    } catch (e) {
+      if (e instanceof ParseError) {
+        this.synchronize();
+        return null;
+      }
+      throw e;
+    }
+  }
+
+  private systemDeclaration(): SystemDecl {
+    const name = this.consume(TokenType.IDENTIFIER, "Expect system name.");
+    this.consume(TokenType.SEMICOLON, "Expect ';' after system name.");
+    return { kind: "SystemDecl", name };
+  }
+
+  private mapStatement(): MapStmt {
+    const name = this.consume(TokenType.IDENTIFIER, "Expect system name.");
+    this.consume(TokenType.SEMICOLON, "Expect ';' after system name.");
+    return { kind: "MapStmt", systemName: name };
+  }
+
+  private listStatement(): ListStmt {
+    const name = this.consume(TokenType.IDENTIFIER, "Expect system name.");
+    this.consume(TokenType.SEMICOLON, "Expect ';' after system name.");
+    return { kind: "ListStmt", systemName: name };
+  }
+
+  private printStatement(): PrintStmt {
+    const name = this.consume(TokenType.IDENTIFIER, "Expect system name.");
+    let rainfall: number[] | null = null;
+    if (this.match(TokenType.NUMBER)) {
+      rainfall = [this.previous().literal as number];
+    } else if (this.match(TokenType.LEFT_BRACKET)) {
+      const values: number[] = [];
+      if (!this.check(TokenType.RIGHT_BRACKET)) {
+        values.push(this.consumeNumber("Expect number in rainfall series."));
+        while (this.match(TokenType.COMMA)) {
+          values.push(
+            this.consumeNumber("Expect number after ',' in rainfall series."),
+          );
+        }
+      }
+      this.consume(
+        TokenType.RIGHT_BRACKET,
+        "Expect ']' to close rainfall series.",
+      );
+      rainfall = values;
+    }
+    this.consume(TokenType.SEMICOLON, "Expect ';' after print statement.");
+    return { kind: "PrintStmt", systemName: name, rainfall };
+  }
+
+  private helpStatement(): HelpStmt {
+    this.consume(TokenType.SEMICOLON, "Expect ';' after 'help'.");
+    return { kind: "HelpStmt" };
+  }
+
+  private riverDeclaration(): RiverDecl {
+    const name = this.consume(TokenType.IDENTIFIER, "Expect river name.");
+    const attrs = this.parseBlock(name);
+    this.consumeOptional(TokenType.SEMICOLON);
+    this.validateAttrs(name, attrs, ["base", "peak"], ["decay"]);
+    return {
+      kind: "RiverDecl",
+      name,
+      baseFlow: attrs.get("base")!,
+      peakMultiplier: attrs.get("peak")!,
+      decayRate: attrs.get("decay") ?? 0.7,
+    };
+  }
+
+  private damDeclaration(): DamDecl {
+    const name = this.consume(TokenType.IDENTIFIER, "Expect dam name.");
+    const attrs = this.parseBlock(name);
+    this.consumeOptional(TokenType.SEMICOLON);
+    this.validateAttrs(
+      name,
+      attrs,
+      ["capacity", "threshold", "normalRate", "openRate"],
+      [],
+    );
+    return {
+      kind: "DamDecl",
+      name,
+      capacity: attrs.get("capacity")!,
+      threshold: attrs.get("threshold")!,
+      normalRate: attrs.get("normalRate")!,
+      openRate: attrs.get("openRate")!,
+    };
+  }
+
+  private outletDeclaration(): OutletDecl {
+    const name = this.consume(TokenType.IDENTIFIER, "Expect outlet name.");
+    if (this.check(TokenType.LEFT_BRACE)) {
+      const attrs = this.parseBlock(name);
+      if (attrs.size > 0) {
+        throw this.errorAt(
+          name,
+          `Outlet '${name.lexeme}' takes no attributes.`,
+        );
+      }
+    }
+    this.consumeOptional(TokenType.SEMICOLON);
+    return { kind: "OutletDecl", name };
+  }
+
+  private chain(): Chain {
+    if (!this.check(TokenType.IDENTIFIER)) {
+      throw this.errorAt(this.peek(), "Expect declaration or chain.");
+    }
+    const nodes: Token[] = [];
+    nodes.push(this.advance());
+    while (this.match(TokenType.ARROW)) {
+      nodes.push(
+        this.consume(TokenType.IDENTIFIER, "Expect node name after '->'."),
+      );
+    }
+    this.consume(TokenType.SEMICOLON, "Expect ';' after chain.");
+    return { kind: "Chain", nodes };
+  }
+
+  private parseBlock(declName: Token): Map<string, number> {
+    this.consume(
+      TokenType.LEFT_BRACE,
+      `Expect '{' to open '${declName.lexeme}' attributes.`,
+    );
+    const attrs = new Map<string, number>();
+    while (!this.check(TokenType.RIGHT_BRACE) && !this.isAtEnd()) {
+      const key = this.consume(TokenType.IDENTIFIER, "Expect attribute name.");
+      this.consume(
+        TokenType.COLON,
+        `Expect ':' after attribute name '${key.lexeme}'.`,
+      );
+      let value = this.consumeNumber("Expect number after ':'.");
+      if (this.match(TokenType.PERCENT)) value = value / 100;
+      if (attrs.has(key.lexeme)) {
+        throw this.errorAt(key, `Duplicate attribute '${key.lexeme}'.`);
+      }
+      attrs.set(key.lexeme, value);
+      this.match(TokenType.COMMA);
+    }
+    this.consume(TokenType.RIGHT_BRACE, "Expect '}' to close attributes.");
+    return attrs;
+  }
+
+  private validateAttrs(
+    declName: Token,
+    attrs: Map<string, number>,
+    required: string[],
+    optional: string[],
+  ): void {
+    for (const key of attrs.keys()) {
+      if (!required.includes(key) && !optional.includes(key)) {
+        throw this.errorAt(
+          declName,
+          `Unknown attribute '${key}' on '${declName.lexeme}'.`,
+        );
+      }
+    }
+    for (const r of required) {
+      if (!attrs.has(r)) {
+        throw this.errorAt(
+          declName,
+          `Missing required attribute '${r}' on '${declName.lexeme}'.`,
+        );
+      }
+    }
+  }
+
+  private consumeNumber(message: string): number {
+    if (!this.check(TokenType.NUMBER)) {
+      throw this.errorAt(this.peek(), message);
+    }
+    return this.advance().literal as number;
+  }
+
+  private match(...types: TokenType[]): boolean {
+    for (const type of types) {
+      if (this.check(type)) {
+        this.advance();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private consumeOptional(type: TokenType): void {
+    if (this.check(type)) this.advance();
+  }
+
+  private consume(type: TokenType, message: string): Token {
+    if (this.check(type)) return this.advance();
+    throw this.errorAt(this.peek(), message);
+  }
+
+  private check(type: TokenType): boolean {
+    if (this.isAtEnd()) return false;
+    return this.peek().type === type;
+  }
+
+  private advance(): Token {
+    if (!this.isAtEnd()) this.current++;
+    return this.previous();
+  }
+
+  private isAtEnd(): boolean {
+    return this.peek().type === TokenType.EOF;
+  }
+
+  private peek(): Token {
+    return this.tokens[this.current]!;
+  }
+
+  private previous(): Token {
+    return this.tokens[this.current - 1]!;
+  }
+
+  private errorAt(token: Token, message: string): ParseError {
+    if (token.type === TokenType.EOF) {
+      this.errs.push(`[line ${token.line}] Error at end: ${message}\n`);
+    } else {
+      this.errs.push(
+        `[line ${token.line}] Error at '${token.lexeme}': ${message}\n`,
+      );
+    }
+    return new ParseError();
+  }
+
+  private synchronize(): void {
+    this.advance();
+    while (!this.isAtEnd()) {
+      if (this.previous().type === TokenType.SEMICOLON) return;
+      switch (this.peek().type) {
+        case TokenType.SYSTEM:
+        case TokenType.RIVER:
+        case TokenType.DAM:
+        case TokenType.OUTLET:
+        case TokenType.MAP:
+        case TokenType.LIST:
+        case TokenType.PRINT:
+          return;
+      }
+      this.advance();
+    }
+  }
+}

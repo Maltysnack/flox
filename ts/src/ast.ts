@@ -1,0 +1,69 @@
+// AST node definitions. Mechanical port of Ast.java.
+//
+// Discriminated union: every node has a `kind` field. Visitor pattern is
+// not idiomatic TypeScript; switch-on-kind is.
+
+import { Token } from "./token.ts";
+
+export type AstNode =
+  | SystemDecl
+  | RiverDecl
+  | DamDecl
+  | OutletDecl
+  | Chain
+  | MapStmt
+  | ListStmt
+  | PrintStmt
+  | HelpStmt;
+
+export interface SystemDecl {
+  readonly kind: "SystemDecl";
+  readonly name: Token;
+}
+
+export interface RiverDecl {
+  readonly kind: "RiverDecl";
+  readonly name: Token;
+  readonly baseFlow: number;
+  readonly peakMultiplier: number;
+  readonly decayRate: number;
+}
+
+export interface DamDecl {
+  readonly kind: "DamDecl";
+  readonly name: Token;
+  readonly capacity: number;
+  readonly threshold: number; // fraction (0.8 = 80%)
+  readonly normalRate: number;
+  readonly openRate: number;
+}
+
+export interface OutletDecl {
+  readonly kind: "OutletDecl";
+  readonly name: Token;
+}
+
+export interface Chain {
+  readonly kind: "Chain";
+  readonly nodes: Token[];
+}
+
+export interface MapStmt {
+  readonly kind: "MapStmt";
+  readonly systemName: Token;
+}
+
+export interface ListStmt {
+  readonly kind: "ListStmt";
+  readonly systemName: Token;
+}
+
+export interface PrintStmt {
+  readonly kind: "PrintStmt";
+  readonly systemName: Token;
+  readonly rainfall: number[] | null; // null means default
+}
+
+export interface HelpStmt {
+  readonly kind: "HelpStmt";
+}

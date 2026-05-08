@@ -2,21 +2,16 @@
 === RIVER SYSTEM: Canberra ===
 
 Connections:
-  burleyGriffinDam [DAM] →  lowerMongolo
+  Googong                →  googongDam [DAM]
+  googongDam [DAM]       →  Queanbeyan
+  Queanbeyan             →  centralMongolo
+  upperMongolo           →  Queanbeyan
   jerrabombarra          →  centralMongolo
   centralMongolo         →  burleyGriffinDam [DAM]
-  Queanbeyan             →  centralMongolo
-  Googong                →  googongDam [DAM]
-  upperMongolo           →  Queanbeyan
-  googongDam [DAM]       →  Queanbeyan
+  burleyGriffinDam [DAM] →  lowerMongolo
 
 
 === RIVER SYSTEM MAP: Canberra ===
-
-jerrabombarra (source)
-  └──▶ centralMongolo [OUTLET]
-    └──▶ burleyGriffinDam [DAM]
-      └──▶ lowerMongolo [OUTLET]
 
 Googong (source)
   └──▶ googongDam [DAM]
@@ -30,6 +25,11 @@ upperMongolo (source)
     └──▶ centralMongolo [OUTLET]
       └──▶ burleyGriffinDam [DAM]
         └──▶ lowerMongolo [OUTLET]
+
+jerrabombarra (source)
+  └──▶ centralMongolo [OUTLET]
+    └──▶ burleyGriffinDam [DAM]
+      └──▶ lowerMongolo [OUTLET]
 
 
 

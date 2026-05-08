@@ -1,0 +1,22 @@
+{
+  "name": "flox",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Flow-network DSL. TypeScript port of the Java reference implementation.",
+  "type": "module",
+  "exports": {
+    ".": "./src/flox.ts"
+  },
+  "bin": {
+    "flox": "./src/cli.ts"
+  },
+  "scripts": {
+    "flox": "tsx src/cli.ts",
+    "test": "bash test/test.sh"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.2",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0"
+  }
+}

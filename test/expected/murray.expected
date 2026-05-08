@@ -7,17 +7,17 @@ UpperMurray (source)
       └──▶ LowerMurray
         └──▶ MurrayMouth [OUTLET]
 
-Darling (source)
-  └──▶ Murray
-    └──▶ LowerMurray
-      └──▶ MurrayMouth [OUTLET]
-
 Murrumbidgee (source)
   └──▶ BurrinjuckDam [DAM]
     └──▶ MurrumbidgeeDownstream
       └──▶ Murray
         └──▶ LowerMurray
           └──▶ MurrayMouth [OUTLET]
+
+Darling (source)
+  └──▶ Murray
+    └──▶ LowerMurray
+      └──▶ MurrayMouth [OUTLET]
 
 
 

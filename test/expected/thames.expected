@@ -2,21 +2,16 @@
 === RIVER SYSTEM: Thames ===
 
 Connections:
-  Kennet                 →  MiddleThames
-  LowerThames            →  ThamesEstuary
-  MiddleThames           →  LowerThames
-  UpperThames            →  MiddleThames
   Churn                  →  UpperThames
-  Cherwell               →  UpperThames
+  UpperThames            →  MiddleThames
+  MiddleThames           →  LowerThames
+  LowerThames            →  ThamesEstuary
   Coln                   →  UpperThames
+  Cherwell               →  UpperThames
+  Kennet                 →  MiddleThames
 
 
 === RIVER SYSTEM MAP: Thames ===
-
-Kennet (source)
-  └──▶ MiddleThames
-    └──▶ LowerThames
-      └──▶ ThamesEstuary [OUTLET]
 
 Churn (source)
   └──▶ UpperThames
@@ -35,6 +30,11 @@ Cherwell (source)
     └──▶ MiddleThames
       └──▶ LowerThames
         └──▶ ThamesEstuary [OUTLET]
+
+Kennet (source)
+  └──▶ MiddleThames
+    └──▶ LowerThames
+      └──▶ ThamesEstuary [OUTLET]
 
 
 

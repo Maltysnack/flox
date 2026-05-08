@@ -48,12 +48,16 @@ See `docs/grammar.md` for the full grammar and `examples/` for more programs.
 ## Project layout
 
 ```
-src/flox/      Java source for the interpreter
+src/flox/      Java reference implementation
+ts/            TypeScript port (foundation for the browser playground)
 examples/      Sample .flox programs
 test/          Golden-file tests; run with `bash test/test.sh`
 docs/          Grammar reference, design notes
-build.sh       One-line build script
+build.sh       Java build script
 ```
+
+Both backends share the `examples/` programs and the `test/expected/`
+golden files. They must produce byte-identical output.
 
 ## Status
 

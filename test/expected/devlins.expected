@@ -2,19 +2,19 @@
 === RIVER SYSTEM: Devlins ===
 
 Connections:
+  Mahers                 →  Joes
   Joes                   →  DevlinsCreek
   Bens                   →  DevlinsCreek
-  Mahers                 →  Joes
 
 
 === RIVER SYSTEM MAP: Devlins ===
 
-Bens (source)
-  └──▶ DevlinsCreek [OUTLET]
-
 Mahers (source)
   └──▶ Joes
     └──▶ DevlinsCreek [OUTLET]
+
+Bens (source)
+  └──▶ DevlinsCreek [OUTLET]
 
 
 
