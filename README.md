@@ -50,15 +50,41 @@ See `docs/grammar.md` for the full grammar and `examples/` for more programs.
 ```
 src/flox/      Java source for the interpreter
 examples/      Sample .flox programs
+test/          Golden-file tests; run with `bash test/test.sh`
 docs/          Grammar reference, design notes
 build.sh       One-line build script
-ROADMAP.md     Where this is going
 ```
 
 ## Status
 
-Working: parser, AST, tree-walking interpreter, river hydrograph simulation,
-network visualisation, multi-day flow tables.
+Working: scanner, parser, AST, two-pass tree-walking interpreter, river
+hydrograph simulation with rainfall series, dam thresholds, network
+visualisation, multi-day flow tables, golden-file test suite.
 
-Known limitations the roadmap addresses: dam storage dynamics are stubbed
-(units bug, see `ROADMAP.md`), single-direction flow, river preset only.
+The project is at the end of Milestone 1. Future work is tracked as
+[GitHub issues](https://github.com/Maltysnack/flox/issues), grouped by
+milestone:
+
+- **M2**: TypeScript port and browser playground
+- **M3**: Generalise the engine; introduce `mode` for non-river networks
+- **M4**: 3D rendering with Three.js
+- **M5**: More modes (traffic, SIR, supply chain, plumbing)
+
+Cross-cutting concerns also live as issues: a more realistic dam model,
+hydrological loss accounting, richer graphical output.
+
+## Working principles
+
+The guiding north star: **Flox should be a flow-network DSL where rivers
+are one mode and Markov chains, traffic, and other compartmental models
+are others. Same parser, same engine, different presets.**
+
+- **Don't break the river preset.** Every change is additive or behind
+  a mode flag.
+- **Each milestone ends with a public artifact.** No internal-only
+  milestones; every meaningful change should land somewhere a visitor
+  can see it.
+- **Resist scope creep inside an issue.** Things that come up belong in
+  a new issue, not in the current branch.
+- **The grammar stays small.** If a feature can be expressed with
+  existing primitives, don't add new syntax for it.
