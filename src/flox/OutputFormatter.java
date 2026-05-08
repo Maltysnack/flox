@@ -9,18 +9,20 @@ class OutputFormatter {
     /* ─────────────────────────────── */
     static void printHelp() {
         System.out.println("=== FLOX SYNTAX REFERENCE ===\n");
-        System.out.println("Rivers:  RiverName[baseFlow, peakMultiplier, decayRate]");
-        System.out.println("         RiverName[baseFlow, peakMultiplier]  (decay defaults to 0.7)");
-        System.out.println("         RiverName[]  (terminator)\n");
-        System.out.println("Dams:    nameDam{capacity, normalRate, openRate}  (threshold defaults to 80%)");
-        System.out.println("         nameDam{capacity, threshold%, normalRate, openRate}\n");
+        System.out.println("Declarations:");
+        System.out.println("  river Name { base: N, peak: N, decay: N }   (decay optional, default 0.7)");
+        System.out.println("  dam   Name { capacity: N, threshold: N%, normalRate: N, openRate: N }");
+        System.out.println("  outlet Name;                                (zero-flow accumulator)\n");
+        System.out.println("Connections:");
+        System.out.println("  A -> B -> C;                                (bare names; declared anywhere)\n");
         System.out.println("Commands:");
-        System.out.println("  system Name;      - Create river system");
-        System.out.println("  list Name;        - Show connections list");
-        System.out.println("  map Name;         - Show network diagram");
-        System.out.println("  print Name;       - Simulate with 1mm rain (default)");
-        System.out.println("  print Name N;     - Simulate with N mm rain");
-        System.out.println("  help;             - Show this message\n");
+        System.out.println("  system Name;                  - Create a system");
+        System.out.println("  list Name;                    - Show connections list");
+        System.out.println("  map Name;                     - Show network diagram");
+        System.out.println("  print Name;                   - Simulate with 1mm rainfall on day 1");
+        System.out.println("  print Name N;                 - Simulate with N mm on day 1");
+        System.out.println("  print Name [r1, r2, r3, ...]; - Per-day rainfall series in mm");
+        System.out.println("  help;                         - Show this message\n");
     }
 
     /* ─────────────────────────────── */
@@ -100,8 +102,8 @@ class OutputFormatter {
     /* ─────────────────────────────── */
     /* FLOW TABLE */
     /* ─────────────────────────────── */
-    static void printFlowTable(RiverSystem system, double rainfall) {
-        System.out.println("\n=== FLOW SIMULATION: " + system.name + " (" + rainfall + "mm rainfall) ===\n");
+    static void printFlowTable(RiverSystem system, double[] rainfall) {
+        System.out.println("\n=== FLOW SIMULATION: " + system.name + " (" + formatRainfall(rainfall) + ") ===\n");
         System.out.println("(Flow values represent water volume per day in L/s)\n");
 
         System.out.print(padRight("Location", 20));
@@ -191,6 +193,30 @@ class OutputFormatter {
         }
 
         System.out.println();
+    }
+
+    /* Render the rainfall input for the flow-table header.
+     * Single non-zero entry: "5.0mm rainfall on day 1".
+     * Anything else: "rainfall mm/day: [0, 5, 30, 10]".
+     */
+    private static String formatRainfall(double[] rainfall) {
+        if (rainfall.length == 1) {
+            return String.format("%.1fmm rainfall on day 1", rainfall[0]);
+        }
+        StringBuilder sb = new StringBuilder("rainfall mm/day: [");
+        for (int i = 0; i < rainfall.length; i++) {
+            if (i > 0) sb.append(", ");
+            sb.append(formatNumber(rainfall[i]));
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
+    private static String formatNumber(double v) {
+        if (v == Math.floor(v) && !Double.isInfinite(v)) {
+            return String.valueOf((long) v);
+        }
+        return String.format("%.1f", v);
     }
 
     /* ─────────────────────────────── */

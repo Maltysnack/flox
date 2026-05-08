@@ -2,11 +2,11 @@ package flox;
 
 class River {
     final String name;
-    final double baseFlow;
-    final double peakMultiplier;
-    final double decayRate;
-    double[] dailyFlow; // Flow for 10 days
-    double totalAccumulated; // Total water received (for terminators)
+    final double baseFlow;       // L/s
+    final double peakMultiplier; // unitless; multiplies rainfall (mm) into flow
+    final double decayRate;      // fraction of surge retained each subsequent day
+    double[] dailyFlow;          // L/s, one entry per simulation day
+    double totalAccumulated;     // L/s-days, accumulated for terminators
 
     River(String name, double baseFlow, double peakMultiplier, double decayRate) {
         this.name = name;
@@ -17,16 +17,21 @@ class River {
         this.totalAccumulated = 0;
     }
 
-    // Calculate flow for a given day and rainfall
-    double calculateFlow(int day, double rainfall) {
-        if (day == 0) {
-            // Day 0: 30% of peak (initial runoff)
-            return baseFlow + (rainfall * peakMultiplier * 0.3);
-        } else {
-            // Day 1+: exponential decay
-            double decayFactor = Math.pow(decayRate, day - 1);
-            return baseFlow + (rainfall * peakMultiplier * decayFactor);
+    // Flow on a given simulation day, given the full rainfall series so far.
+    // Each non-zero entry rainfall[d] kicks off its own hydrograph; flow is
+    // the superposition of every event that has happened up to (and including)
+    // day. response(0) is the rising limb (0.3 of peak), response(1) is the
+    // peak itself, response(k>=1) is decay^(k-1) of the peak.
+    double calculateFlow(int day, double[] rainfall) {
+        double total = baseFlow;
+        for (int d = 0; d <= day && d < rainfall.length; d++) {
+            double r = rainfall[d];
+            if (r == 0) continue;
+            int k = day - d;
+            double factor = (k == 0) ? 0.3 : Math.pow(decayRate, k - 1);
+            total += r * peakMultiplier * factor;
         }
+        return total;
     }
 
     boolean isTerminator() {

@@ -61,8 +61,10 @@ class RiverSystem {
         return null;
     }
 
-    // Simulate flow for given rainfall over 10 days
-    void simulate(double rainfall) {
+    // Simulate flow over 10 days given a daily rainfall series (mm).
+    // The series may be shorter than 10 entries; missing days are treated
+    // as zero rainfall.
+    void simulate(double[] rainfall) {
         // Reset dams and terminators
         for (Dam dam : dams.values()) {
             dam.reset();

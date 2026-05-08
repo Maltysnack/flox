@@ -138,12 +138,14 @@ abstract class Ast {
         }
     }
 
-    // print Canberra; or print Canberra 5;
+    // print Canberra;            (default: 1mm on day 1)
+    // print Canberra 5;          (single 5mm event on day 1)
+    // print Canberra [0, 5, 30]; (rainfall series, day-by-day)
     public static class PrintStmt extends Ast {
         public final Token systemName;
-        public final Double rainfall; // null means default (1mm)
+        public final double[] rainfall; // null means use default
 
-        public PrintStmt(Token systemName, Double rainfall) {
+        public PrintStmt(Token systemName, double[] rainfall) {
             this.systemName = systemName;
             this.rainfall = rainfall;
         }

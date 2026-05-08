@@ -65,12 +65,25 @@ class Parser {
         return new Ast.ListStmt(name);
     }
 
-    // print Canberra; or print Canberra 5;
+    // print Canberra;
+    // print Canberra 5;            (single rainfall event of 5mm on day 1)
+    // print Canberra [0, 5, 30, 10];  (per-day rainfall series in mm)
     private Ast printStatement() {
         Token name = consume(IDENTIFIER, "Expect system name.");
-        Double rainfall = null;
+        double[] rainfall = null;
         if (match(NUMBER)) {
-            rainfall = (Double) previous().literal;
+            rainfall = new double[] { (Double) previous().literal };
+        } else if (match(LEFT_BRACKET)) {
+            List<Double> values = new ArrayList<>();
+            if (!check(RIGHT_BRACKET)) {
+                values.add(consumeNumber("Expect number in rainfall series."));
+                while (match(COMMA)) {
+                    values.add(consumeNumber("Expect number after ',' in rainfall series."));
+                }
+            }
+            consume(RIGHT_BRACKET, "Expect ']' to close rainfall series.");
+            rainfall = new double[values.size()];
+            for (int i = 0; i < values.size(); i++) rainfall[i] = values.get(i);
         }
         consume(SEMICOLON, "Expect ';' after print statement.");
         return new Ast.PrintStmt(name, rainfall);

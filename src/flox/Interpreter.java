@@ -165,7 +165,8 @@ class Interpreter implements Ast.Visitor<Void> {
     public Void visitPrintStmt(Ast.PrintStmt stmt) {
         if (phase != Phase.EXECUTE) return null;
         RiverSystem system = lookupSystem(stmt.systemName);
-        double rainfall = (stmt.rainfall != null) ? stmt.rainfall : 1.0;
+        // Default: 1mm on day 1, dry thereafter.
+        double[] rainfall = (stmt.rainfall != null) ? stmt.rainfall : new double[] { 1.0 };
         system.simulate(rainfall);
         OutputFormatter.printFlowTable(system, rainfall);
         return null;
