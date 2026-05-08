@@ -1,0 +1,16 @@
+// A program full of comments. Output should be the same as a version
+// without any comments.
+
+/*
+ * Multi-line block comments are allowed too.
+ * They do not nest.
+ */
+
+system Comments;
+
+/* chains */ A -> B;   // single-edge
+
+river  A { base: 1, peak: 1 }   // source
+outlet B;                       /* sink */
+
+map Comments;

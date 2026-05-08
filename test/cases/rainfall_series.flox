@@ -1,0 +1,9 @@
+// A rainfall series: dry day, light rain, big storm, light again.
+system SeriesDemo;
+
+Spring -> Outlet;
+
+river  Spring { base: 2, peak: 2.0, decay: 0.7 }
+outlet Outlet;
+
+print SeriesDemo [0, 1, 30, 10, 0, 0, 0];

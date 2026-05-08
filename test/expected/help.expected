@@ -1,0 +1,19 @@
+=== FLOX SYNTAX REFERENCE ===
+
+Declarations:
+  river Name { base: N, peak: N, decay: N }   (decay optional, default 0.7)
+  dam   Name { capacity: N, threshold: N%, normalRate: N, openRate: N }
+  outlet Name;                                (zero-flow accumulator)
+
+Connections:
+  A -> B -> C;                                (bare names; declared anywhere)
+
+Commands:
+  system Name;                  - Create a system
+  list Name;                    - Show connections list
+  map Name;                     - Show network diagram
+  print Name;                   - Simulate with 1mm rainfall on day 1
+  print Name N;                 - Simulate with N mm on day 1
+  print Name [r1, r2, r3, ...]; - Per-day rainfall series in mm
+  help;                         - Show this message
+

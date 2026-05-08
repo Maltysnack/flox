@@ -1,0 +1,4 @@
+// Required attribute 'peak' missing.
+system Bad;
+
+river A { base: 1 }

@@ -1,0 +1,5 @@
+// Same node name declared twice in the same system.
+system Bad;
+
+river A { base: 1, peak: 1 }
+river A { base: 2, peak: 2 }

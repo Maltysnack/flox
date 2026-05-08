@@ -1,0 +1,12 @@
+// A 100mm storm on day 1 forces a small reservoir past its threshold.
+// Outflow should switch from normalRate to openRate as storage fills,
+// then back to normalRate as it drains.
+system Storm;
+
+bigRain -> reservoir -> sea;
+
+river  bigRain   { base: 5, peak: 10.0, decay: 0.5 }
+dam    reservoir { capacity: 50, threshold: 80%, normalRate: 0.5, openRate: 2.0 }
+outlet sea;
+
+print Storm 100;

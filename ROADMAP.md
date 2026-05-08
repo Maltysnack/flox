@@ -49,15 +49,21 @@ Small fixes that make the current river language solid before extending it.
       - [ ] Rewrite `docs/grammar.md` and the public grammar reference
             (`maltysnack-site/projects/flox/docs/grammar.html`) to match.
 
-- [ ] Fix the dam units bug. Inflow is L/s, currentLevel is ML; they get
-      added together. Convert with `inflow_L_per_s * 0.0864 = ML/day` before
-      mutating the level. With this fixed, `threshold` and `openRate` actually
-      do something.
-- [ ] Rainfall as a series, not a scalar:
-      `print Sydney with rainfall [0, 5, 30, 10, 0, 0];` for storm events.
-- [ ] Tests. Even just a `test/` dir of `.flox` files with `.expected` outputs
-      and a shell script that diffs them. Catches regressions when the engine
-      is generalised in M3.
+- [x] Fix the dam units bug. Inflow is L/s, currentLevel is ML; the
+      old code added them together. Now converted at the storage
+      boundary with `inflow_L_per_s * 0.0864 = ML/day`. Threshold and
+      openRate now fire correctly when storage actually crosses the
+      threshold.
+- [x] Rainfall as a series, not a scalar.
+      `print Demo [0, 5, 30, 10];` accepted alongside the existing
+      `print Demo 5;` scalar form. Each non-zero entry kicks off its
+      own hydrograph; flow is the superposition.
+- [x] Tests. `test/` directory with golden-file `.expected` pairs
+      and a `bash test/test.sh` runner. Covers all examples plus
+      targeted edge cases (forward references, comments, error paths,
+      a storm that crosses dam threshold, and the rainfall series
+      form). Run with `--update` to regenerate after intentional
+      output changes.
 
 ## Milestone 2: TypeScript port + browser playground
 

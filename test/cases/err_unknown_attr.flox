@@ -1,0 +1,4 @@
+// Unknown attribute 'wibble' on a river declaration.
+system Bad;
+
+river A { base: 1, peak: 1, wibble: 99 }

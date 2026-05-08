@@ -1,0 +1,6 @@
+// Chain references a node ('B') that is never declared.
+system Bad;
+
+A -> B;
+
+river A { base: 1, peak: 1 }

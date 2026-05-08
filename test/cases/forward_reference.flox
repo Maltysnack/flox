@@ -1,0 +1,10 @@
+// Forward references: chains may name nodes declared later in the file.
+system Forward;
+
+A -> B -> C;
+
+river  A { base: 1, peak: 1 }
+river  B { base: 1, peak: 1 }
+outlet C;
+
+map Forward;
