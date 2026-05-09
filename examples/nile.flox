@@ -1,0 +1,42 @@
+// The Nile: two great sources meeting at Khartoum, flowing north
+// through the Aswan High Dam into the Mediterranean. The White Nile
+// drains the equatorial lakes via Lake Victoria; the Blue Nile carries
+// the Ethiopian highlands' summer monsoon and is the system's flashy
+// pulse.
+system Nile;
+
+// White Nile: lake-fed, very steady; gathers tributaries from the
+// Sudd swamps as it heads north.
+LakeVictoria -> WhiteNile;
+Sobat        -> WhiteNile;
+BahrElGhazal -> WhiteNile;
+
+// Confluence at Khartoum where the Blue Nile meets the White,
+// then the main Nile to the Aswan dam and through Egypt.
+BlueNile  -> Khartoum;
+WhiteNile -> Khartoum;
+Khartoum  -> Atbara -> AswanHighDam -> LowerNile -> Mediterranean;
+
+// Sources
+river LakeVictoria { base: 8, peak: 1.0, decay: 0.95 }   // huge lake, very damped
+river Sobat        { base: 3, peak: 2.0, decay: 0.7 }
+river BahrElGhazal { base: 2, peak: 1.5, decay: 0.8 }
+river BlueNile     { base: 6, peak: 4.0, decay: 0.5 }    // monsoon-driven, flashy
+
+// Trunk reaches
+river WhiteNile { base: 12, peak: 1.2, decay: 0.85 }
+river Khartoum  { base: 18, peak: 2.5, decay: 0.7 }
+river Atbara    { base: 18, peak: 2.5, decay: 0.7 }
+river LowerNile { base: 20, peak: 1.8, decay: 0.8 }
+
+// Aswan reservoir (Lake Nasser). Capacity is stylized; threshold and
+// rates are tuned to make the dam visibly engage during a storm.
+dam AswanHighDam { capacity: 30000, threshold: 70%, normalRate: 0.85, openRate: 1.4 }
+
+outlet Mediterranean;
+
+map Nile;
+
+// The Ethiopian summer rains: a multi-day pulse of monsoon over the
+// Blue Nile's catchment.
+print Nile [0, 5, 60, 40, 20, 10, 5];

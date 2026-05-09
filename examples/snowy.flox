@@ -1,0 +1,43 @@
+// Snowy Mountains Scheme: the Australian hydroelectric and irrigation
+// project that diverts water from the Snowy River catchment inland to
+// the Murray and Murrumbidgee. Multiple dams, a diversion split, and
+// two outlets (one to Bass Strait via the much-reduced Snowy, one west
+// to the inland irrigation network).
+system SnowyMountains;
+
+// Snowy and Eucumbene rivers feed the scheme's largest reservoir.
+SnowyR     -> EucumbeneDam;
+EucumbeneR -> EucumbeneDam;
+
+// From Eucumbene the scheme splits two ways:
+//  - West, through the Tumut tunnel and Blowering Dam, into the
+//    Murrumbidgee (irrigation).
+//  - South, into Jindabyne, where a second split sends most water
+//    west into the Murray via the Murray 1 / 2 power stations and a
+//    much-reduced flow continues south as the Snowy's natural outlet.
+EucumbeneDam -> TumutR -> BloweringDam -> Murrumbidgee;
+EucumbeneDam -> JindabyneDam;
+JindabyneDam -> Murray1 -> UpperMurray;
+JindabyneDam -> SnowyOutflow;
+
+// Sources
+river SnowyR     { base: 4, peak: 3.0, decay: 0.6 }
+river EucumbeneR { base: 2, peak: 2.0, decay: 0.7 }
+
+// Trunk reaches
+river TumutR      { base: 3, peak: 2.0, decay: 0.7 }
+river Murray1     { base: 2, peak: 1.0, decay: 0.8 }
+river UpperMurray { base: 5, peak: 2.5, decay: 0.7 }
+
+// Reservoirs
+dam EucumbeneDam { capacity: 4800, threshold: 75%, normalRate: 0.6, openRate: 1.3 }
+dam JindabyneDam { capacity: 700,  threshold: 80%, normalRate: 0.5, openRate: 1.5 }
+dam BloweringDam { capacity: 1600, threshold: 70%, normalRate: 0.8, openRate: 1.3 }
+
+outlet Murrumbidgee;
+outlet SnowyOutflow;
+
+map SnowyMountains;
+
+// Spring snowmelt plus a mid-storm: ten days of varied rainfall.
+print SnowyMountains [2, 5, 30, 40, 20, 10, 5, 3, 2, 1];

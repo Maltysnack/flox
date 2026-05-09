@@ -1,0 +1,43 @@
+
+=== RIVER SYSTEM MAP: Brisbane ===
+
+StanleyR (source)
+  └──▶ SomersetDam [DAM]
+    └──▶ WivenhoeDam [DAM]
+      └──▶ LowerBrisbaneR
+        └──▶ MoretonBay [OUTLET]
+
+UpperBrisbaneR (source)
+  └──▶ WivenhoeDam [DAM]
+    └──▶ LowerBrisbaneR
+      └──▶ MoretonBay [OUTLET]
+
+LockyerCk (source)
+  └──▶ LowerBrisbaneR
+    └──▶ MoretonBay [OUTLET]
+
+BremerR (source)
+  └──▶ LowerBrisbaneR
+    └──▶ MoretonBay [OUTLET]
+
+
+
+=== FLOW SIMULATION: Brisbane (rainfall mm/day: [10, 30, 80, 60, 40, 20, 10, 5]) ===
+
+(Flow values represent water volume per day in L/s)
+
+Location            | Day  1 | Day  2 | Day  3 | Day  4 | Day  5 | Day  6 | Day  7 | Day  8 | Day  9 | Day 10 |
+--------------------|--------|--------|--------|--------|--------|--------|--------|--------|--------|--------|
+StanleyR            |   10.5 |   58.5 |  181.5 |  360.3 |  400.4 |  357.2 |  273.1 |  193.6 |  129.0 |   78.0 |
+UpperBrisbaneR      |    9.5 |   49.5 |  153.3 |  306.3 |  350.6 |  324.1 |  259.1 |  193.0 |  136.2 |   89.2 |
+LockyerCk           |   13.0 |   77.0 |  237.0 |  463.0 |  484.0 |  402.5 |  281.8 |  181.4 |  108.2 |   54.6 |
+BremerR             |   10.0 |   58.0 |  181.0 |  359.8 |  399.9 |  356.7 |  272.6 |  193.1 |  128.5 |   77.5 |
+LowerBrisbaneR      |   39.2 |  204.7 |  628.1 |  1243.8 |  1381.7 |  1240.9 |  964.4 |  704.4 |  492.9 |  323.1 |
+SomersetDam         |    7.4 |   40.9 |  127.1 |  252.2 |  280.3 |  250.1 |  191.2 |  135.5 |   90.3 |   54.6 |
+WivenhoeDam         |    6.7 |   36.2 |  112.1 |  223.4 |  252.3 |  229.6 |  180.1 |  131.4 |   90.6 |   57.5 |
+--------------------|--------|--------|--------|--------|--------|--------|--------|--------|--------|--------|
+Cumulative Outlet (converted to actual volume):
+MoretonBay [OUTLET] |  3.39ML| 21.07ML| 75.34ML| 182.81ML| 302.19ML| 409.40ML| 492.72ML| 553.58ML| 596.17ML| 624.08ML|
+
+Total water accumulated at outlet: 624.08 ML (megaliters)
+

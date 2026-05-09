@@ -1,0 +1,37 @@
+// Brisbane River with Wivenhoe Dam: the city's water supply and main
+// flood defence, famously stress-tested by the 2011 floods. Three
+// flashy headwater catchments converge upstream of Wivenhoe; two more
+// (Lockyer Creek, Bremer River) join below it; the lower river runs
+// tidal through the city to Moreton Bay.
+system Brisbane;
+
+// Upper catchment, dammed at Somerset and then Wivenhoe.
+StanleyR       -> SomersetDam -> WivenhoeDam;
+UpperBrisbaneR -> WivenhoeDam;
+
+// Tributaries that join below Wivenhoe go straight into the lower
+// river. They contribute to the flood peak that the dam can't see.
+LockyerCk -> LowerBrisbaneR;
+BremerR   -> LowerBrisbaneR;
+
+// Wivenhoe to the bay.
+WivenhoeDam     -> LowerBrisbaneR -> MoretonBay;
+
+river StanleyR        { base: 1.5, peak: 3.0, decay: 0.6 }
+river UpperBrisbaneR  { base: 2,   peak: 2.5, decay: 0.65 }
+river LockyerCk       { base: 1,   peak: 4.0, decay: 0.5 }    // very flashy
+river BremerR         { base: 1,   peak: 3.0, decay: 0.6 }
+river LowerBrisbaneR  { base: 5,   peak: 1.5, decay: 0.8 }    // tidal, slow
+
+// Somerset and Wivenhoe. Wivenhoe in real life has separate water-supply
+// and flood-mitigation rules; here it's modelled as one rate switch
+// that opens hard once storage passes its full-supply level.
+dam SomersetDam { capacity: 380,  threshold: 90%,  normalRate: 0.7, openRate: 1.5 }
+dam WivenhoeDam { capacity: 1165, threshold: 100%, normalRate: 0.4, openRate: 2.0 }
+
+outlet MoretonBay;
+
+map Brisbane;
+
+// A 2011-style multi-day flood: heavy rain banked up over a week.
+print Brisbane [10, 30, 80, 60, 40, 20, 10, 5];
