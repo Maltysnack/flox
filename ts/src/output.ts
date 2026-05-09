@@ -110,31 +110,72 @@ export function printFlowTable(
   );
   o.println("(Flow values represent water volume per day in L/s)\n");
 
-  o.print(padRight("Location", 20));
+  const finalOutlet = system.getFinalOutlet();
+
+  // Pre-scan to compute column widths so big numbers and long node
+  // names don't break the grid alignment.
+  let valWidth = 5; // minimum, supports up to "999.9"
+  let locWidth = 8; // minimum, supports "Location"
+  for (const r of system.rivers.values()) {
+    if (r.name === finalOutlet) continue;
+    if (r.name.length > locWidth) locWidth = r.name.length;
+    for (let day = 0; day < 10; day++) {
+      const w = fmtFixed(r.dailyFlow[day]!, 1).length;
+      if (w > valWidth) valWidth = w;
+    }
+  }
+  for (const d of system.dams.values()) {
+    if (d.name.length > locWidth) locWidth = d.name.length;
+    for (let day = 0; day < 10; day++) {
+      const w = fmtFixed(d.dailyOutflow[day]!, 1).length;
+      if (w > valWidth) valWidth = w;
+    }
+  }
+  if (finalOutlet !== null) {
+    const outlet = system.rivers.get(finalOutlet);
+    if (outlet) {
+      const labelLen = (outlet.name + " [OUTLET]").length;
+      if (labelLen > locWidth) locWidth = labelLen;
+      let cumulative = 0;
+      for (let day = 0; day < 10; day++) {
+        cumulative += outlet.dailyFlow[day]!;
+        const w = formatCumulative(cumulative).length;
+        if (w > valWidth) valWidth = w;
+      }
+    }
+  }
+
+  // Each cell between pipes: 2 leading spaces + value + 1 trailing.
+  const interior = valWidth + 3;
+  const dashes = "-".repeat(interior);
+  const locDashes = "-".repeat(locWidth);
+
+  // Header row
+  o.print(padRight("Location", locWidth));
   for (let day = 1; day <= 10; day++) {
-    o.print("| Day " + padLeft(String(day), 2) + " ");
+    const dayStr = "Day " + padLeft(String(day), 2);
+    o.print("|" + padCenter(dayStr, interior));
   }
   o.println("|");
 
-  o.print("--------------------|");
-  for (let i = 0; i < 10; i++) o.print("--------|");
+  // Top separator
+  o.print(locDashes + "|");
+  for (let i = 0; i < 10; i++) o.print(dashes + "|");
   o.println("");
-
-  const finalOutlet = system.getFinalOutlet();
 
   for (const r of system.rivers.values()) {
     if (r.name === finalOutlet) continue;
-    o.print(padRight(r.name, 20));
+    o.print(padRight(r.name, locWidth));
     for (let day = 0; day < 10; day++) {
-      o.print("|  " + padLeft(fmtFixed(r.dailyFlow[day]!, 1), 5) + " ");
+      o.print("|  " + padLeft(fmtFixed(r.dailyFlow[day]!, 1), valWidth) + " ");
     }
     o.println("|");
   }
 
   for (const d of system.dams.values()) {
-    o.print(padRight(d.name, 20));
+    o.print(padRight(d.name, locWidth));
     for (let day = 0; day < 10; day++) {
-      o.print("|  " + padLeft(fmtFixed(d.dailyOutflow[day]!, 1), 5) + " ");
+      o.print("|  " + padLeft(fmtFixed(d.dailyOutflow[day]!, 1), valWidth) + " ");
     }
     o.println("|");
   }
@@ -142,29 +183,16 @@ export function printFlowTable(
   if (finalOutlet !== null) {
     const outlet = system.rivers.get(finalOutlet);
     if (outlet) {
-      o.print("--------------------|");
-      for (let i = 0; i < 10; i++) o.print("--------|");
+      o.print(locDashes + "|");
+      for (let i = 0; i < 10; i++) o.print(dashes + "|");
       o.println("");
       o.println("Cumulative Outlet (converted to actual volume):");
 
-      o.print(padRight(outlet.name + " [OUTLET]", 20));
+      o.print(padRight(outlet.name + " [OUTLET]", locWidth));
       let cumulative = 0;
       for (let day = 0; day < 10; day++) {
         cumulative += outlet.dailyFlow[day]!;
-        const litersPerDay = cumulative * 86400;
-        const gigaliters = litersPerDay / 1_000_000_000;
-
-        if (gigaliters >= 1.0) {
-          o.print("| " + padLeft(fmtFixed(gigaliters, 2), 5) + "GL");
-        } else if (gigaliters >= 0.001) {
-          const megaliters = litersPerDay / 1_000_000;
-          o.print("| " + padLeft(fmtFixed(megaliters, 2), 5) + "ML");
-        } else if (gigaliters >= 0.000001) {
-          const kiloliters = litersPerDay / 1_000;
-          o.print("| " + padLeft(fmtFixed(kiloliters, 2), 5) + "KL");
-        } else {
-          o.print("| " + padLeft(fmtFixed(litersPerDay, 1), 5) + "L ");
-        }
+        o.print("|  " + padLeft(formatCumulative(cumulative), valWidth) + " ");
       }
       o.println("|");
 
@@ -202,6 +230,25 @@ export function printFlowTable(
   }
 
   o.println("");
+}
+
+// Render the cumulative outlet volume in the most appropriate unit
+// (L, KL, ML, GL). Returns the value with its unit suffix; no padding.
+function formatCumulative(cumulativeFlowLps: number): string {
+  const litersPerDay = cumulativeFlowLps * 86400;
+  const gigaliters = litersPerDay / 1_000_000_000;
+  if (gigaliters >= 1.0) return fmtFixed(gigaliters, 2) + "GL";
+  if (gigaliters >= 0.001) return fmtFixed(litersPerDay / 1_000_000, 2) + "ML";
+  if (gigaliters >= 0.000001) return fmtFixed(litersPerDay / 1_000, 2) + "KL";
+  return fmtFixed(litersPerDay, 1) + "L";
+}
+
+function padCenter(s: string, n: number): string {
+  if (s.length >= n) return s.slice(0, n);
+  const pad = n - s.length;
+  const left = Math.floor(pad / 2);
+  const right = pad - left;
+  return " ".repeat(left) + s + " ".repeat(right);
 }
 
 function formatRainfall(rainfall: number[]): string {

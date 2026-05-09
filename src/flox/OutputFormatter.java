@@ -106,67 +106,94 @@ class OutputFormatter {
         System.out.println("\n=== FLOW SIMULATION: " + system.name + " (" + formatRainfall(rainfall) + ") ===\n");
         System.out.println("(Flow values represent water volume per day in L/s)\n");
 
-        System.out.print(padRight("Location", 20));
-        for (int day = 1; day <= 10; day++)
-            System.out.print("| Day " + padLeft(String.valueOf(day), 2) + " ");
-        System.out.println("|");
-
-        System.out.print("--------------------|");
-        for (int i = 0; i < 10; i++)
-            System.out.print("--------|");
-        System.out.println();
-
-        // Find the final outlet
         String finalOutlet = system.getFinalOutlet();
 
-        // Print ALL rivers except the final outlet (including intermediate terminators)
+        // Pre-scan to compute column widths so big numbers and long node
+        // names don't break the grid alignment.
+        // valWidth: width of the widest value in any cell (raw flows or
+        // unit-suffixed cumulative volumes).
+        // locWidth: width of the widest row label.
+        int valWidth = 5; // minimum, supports up to "999.9"
+        int locWidth = 8; // minimum, supports "Location"
         for (River r : system.rivers.values()) {
-            if (r.name.equals(finalOutlet))
-                continue; // Skip final outlet for now
-
-            System.out.print(padRight(r.name, 20));
-            for (int day = 0; day < 10; day++)
-                System.out.print(String.format("|  %5.1f ", r.dailyFlow[day]));
-            System.out.println("|");
+            if (r.name.equals(finalOutlet)) continue;
+            locWidth = Math.max(locWidth, r.name.length());
+            for (int day = 0; day < 10; day++) {
+                valWidth = Math.max(valWidth, String.format("%.1f", r.dailyFlow[day]).length());
+            }
         }
-
-        // Print dams
         for (Dam d : system.dams.values()) {
-            System.out.print(padRight(d.name, 20));
-            for (int day = 0; day < 10; day++)
-                System.out.print(String.format("|  %5.1f ", d.dailyOutflow[day]));
-            System.out.println("|");
+            locWidth = Math.max(locWidth, d.name.length());
+            for (int day = 0; day < 10; day++) {
+                valWidth = Math.max(valWidth, String.format("%.1f", d.dailyOutflow[day]).length());
+            }
         }
-
-        // Print final outlet with cumulative totals converted to GL
         if (finalOutlet != null) {
             River outlet = system.rivers.get(finalOutlet);
             if (outlet != null) {
-                System.out.print("--------------------|");
-                for (int i = 0; i < 10; i++)
-                    System.out.print("--------|");
-                System.out.println();
-                System.out.println("Cumulative Outlet (converted to actual volume):");
-
-                System.out.print(padRight(outlet.name + " [OUTLET]", 20));
+                locWidth = Math.max(locWidth, (outlet.name + " [OUTLET]").length());
                 double cumulative = 0;
                 for (int day = 0; day < 10; day++) {
                     cumulative += outlet.dailyFlow[day];
-                    // Convert L/s to liters per day, then to gigaliters
-                    double litersPerDay = cumulative * 86400; // seconds per day
-                    double gigaliters = litersPerDay / 1_000_000_000.0;
+                    valWidth = Math.max(valWidth, formatCumulative(cumulative).length());
+                }
+            }
+        }
 
-                    if (gigaliters >= 1.0) {
-                        System.out.print(String.format("| %5.2fGL", gigaliters));
-                    } else if (gigaliters >= 0.001) {
-                        double megaliters = litersPerDay / 1_000_000.0;
-                        System.out.print(String.format("| %5.2fML", megaliters));
-                    } else if (gigaliters >= 0.000001) {
-                        double kiloliters = litersPerDay / 1_000.0;
-                        System.out.print(String.format("| %5.2fKL", kiloliters));
-                    } else {
-                        System.out.print(String.format("| %5.1fL ", litersPerDay));
-                    }
+        // Each cell between pipes: 2 leading spaces + value + 1 trailing.
+        int interior = valWidth + 3;
+        String dashes = "-".repeat(interior);
+        String locDashes = "-".repeat(locWidth);
+
+        // Header row
+        System.out.print(padRight("Location", locWidth));
+        for (int day = 1; day <= 10; day++) {
+            String dayStr = "Day " + padLeft(String.valueOf(day), 2);
+            System.out.print("|" + padCenter(dayStr, interior));
+        }
+        System.out.println("|");
+
+        // Top separator
+        System.out.print(locDashes + "|");
+        for (int i = 0; i < 10; i++) System.out.print(dashes + "|");
+        System.out.println();
+
+        // Rivers (skip the final outlet; printed separately as cumulative)
+        for (River r : system.rivers.values()) {
+            if (r.name.equals(finalOutlet)) continue;
+            System.out.print(padRight(r.name, locWidth));
+            for (int day = 0; day < 10; day++) {
+                String val = String.format("%.1f", r.dailyFlow[day]);
+                System.out.print("|  " + padLeft(val, valWidth) + " ");
+            }
+            System.out.println("|");
+        }
+
+        // Dams
+        for (Dam d : system.dams.values()) {
+            System.out.print(padRight(d.name, locWidth));
+            for (int day = 0; day < 10; day++) {
+                String val = String.format("%.1f", d.dailyOutflow[day]);
+                System.out.print("|  " + padLeft(val, valWidth) + " ");
+            }
+            System.out.println("|");
+        }
+
+        // Cumulative outlet
+        if (finalOutlet != null) {
+            River outlet = system.rivers.get(finalOutlet);
+            if (outlet != null) {
+                System.out.print(locDashes + "|");
+                for (int i = 0; i < 10; i++) System.out.print(dashes + "|");
+                System.out.println();
+                System.out.println("Cumulative Outlet (converted to actual volume):");
+
+                System.out.print(padRight(outlet.name + " [OUTLET]", locWidth));
+                double cumulative = 0;
+                for (int day = 0; day < 10; day++) {
+                    cumulative += outlet.dailyFlow[day];
+                    String val = formatCumulative(cumulative);
+                    System.out.print("|  " + padLeft(val, valWidth) + " ");
                 }
                 System.out.println("|");
 
@@ -193,6 +220,22 @@ class OutputFormatter {
         }
 
         System.out.println();
+    }
+
+    // Render the cumulative outlet volume in the most appropriate unit
+    // (L, KL, ML, GL). Returns just the value+unit, no padding.
+    private static String formatCumulative(double cumulativeFlowLps) {
+        double litersPerDay = cumulativeFlowLps * 86400;
+        double gigaliters = litersPerDay / 1_000_000_000.0;
+        if (gigaliters >= 1.0) {
+            return String.format("%.2fGL", gigaliters);
+        } else if (gigaliters >= 0.001) {
+            return String.format("%.2fML", litersPerDay / 1_000_000.0);
+        } else if (gigaliters >= 0.000001) {
+            return String.format("%.2fKL", litersPerDay / 1_000.0);
+        } else {
+            return String.format("%.1fL", litersPerDay);
+        }
     }
 
     /* Render the rainfall input for the flow-table header.
