@@ -12,10 +12,12 @@
   },
   "scripts": {
     "flox": "tsx src/cli.ts",
-    "test": "bash test/test.sh"
+    "test": "bash test/test.sh",
+    "build": "esbuild src/flox.ts --bundle --format=esm --target=es2022 --outfile=dist/flox.js"
   },
   "devDependencies": {
     "@types/node": "^25.6.2",
+    "esbuild": "^0.28.0",
     "tsx": "^4.19.0",
     "typescript": "^5.5.0"
   }
