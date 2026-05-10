@@ -10,6 +10,7 @@ export class River {
     readonly baseFlow: number,
     readonly peakMultiplier: number,
     readonly decayRate: number,
+    readonly supply: number = 0,
   ) {}
 
   // Flow on a given simulation day, given the full rainfall series so far.
@@ -80,7 +81,7 @@ export class Dam {
   }
 }
 
-export type Mode = "river" | "markov";
+export type Mode = "river" | "markov" | "grid";
 
 export interface Edge {
   target: string;
@@ -99,6 +100,12 @@ export class RiverSystem {
   markovHistory: Map<string, number[]> = new Map();
   markovTicksRun = 0;
   markovConverged = false;
+
+  // Grid state
+  gridLevel: Map<string, number> = new Map();
+  gridFlow: Map<string, number> = new Map();   // "A->B" -> flow A→B
+  gridTicksRun = 0;
+  gridConverged = false;
 
   constructor(readonly name: string) {}
 
@@ -226,6 +233,72 @@ export class RiverSystem {
         this.markovConverged = true;
         break;
       }
+    }
+  }
+
+  // Grid-mode simulation. Each undirected edge {A,B} with conductance c
+  // carries flow (level[A] - level[B]) * c. Each node has a 'supply'
+  // (positive = injects, negative = draws). Levels integrate
+  // (supply + net_inflow) over time with a damping factor dt.
+  simulateGrid(maxTicks: number): void {
+    const EPSILON = 1e-7;
+    const DT = 0.1;
+
+    const nodes: string[] = [...this.rivers.keys(), ...this.dams.keys()];
+
+    // Reduce parallel edges and ignore arrow direction (grid mode is
+    // bidirectional). edgeKey = "alphabetically-first|alphabetically-second".
+    const edgeC = new Map<string, number>();
+    const edgeEnds = new Map<string, [string, string]>();
+    for (const [from, edges] of this.connections) {
+      for (const e of edges) {
+        const key = from <= e.target ? `${from}|${e.target}` : `${e.target}|${from}`;
+        edgeC.set(key, (edgeC.get(key) ?? 0) + e.weight);
+        if (!edgeEnds.has(key)) edgeEnds.set(key, [from, e.target]);
+      }
+    }
+
+    this.gridLevel.clear();
+    for (const n of nodes) this.gridLevel.set(n, 0);
+    this.gridTicksRun = 0;
+    this.gridConverged = false;
+
+    for (let t = 1; t <= maxTicks; t++) {
+      const delta = new Map<string, number>();
+      for (const n of nodes) delta.set(n, 0);
+
+      for (const n of nodes) {
+        const r = this.rivers.get(n);
+        const supply = r ? r.supply : 0;
+        delta.set(n, delta.get(n)! + supply);
+      }
+
+      for (const [key, ends] of edgeEnds) {
+        const c = edgeC.get(key)!;
+        const flow = (this.gridLevel.get(ends[0])! - this.gridLevel.get(ends[1])!) * c;
+        delta.set(ends[0], delta.get(ends[0])! - flow);
+        delta.set(ends[1], delta.get(ends[1])! + flow);
+      }
+
+      let maxDiff = 0;
+      for (const n of nodes) {
+        const d = DT * delta.get(n)!;
+        maxDiff = Math.max(maxDiff, Math.abs(d));
+        this.gridLevel.set(n, this.gridLevel.get(n)! + d);
+      }
+      this.gridTicksRun = t;
+
+      if (maxDiff < EPSILON) {
+        this.gridConverged = true;
+        break;
+      }
+    }
+
+    this.gridFlow.clear();
+    for (const [key, ends] of edgeEnds) {
+      const c = edgeC.get(key)!;
+      const flow = (this.gridLevel.get(ends[0])! - this.gridLevel.get(ends[1])!) * c;
+      this.gridFlow.set(`${ends[0]}->${ends[1]}`, flow);
     }
   }
 

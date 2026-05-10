@@ -300,6 +300,94 @@ class OutputFormatter {
         System.out.println();
     }
 
+    /* ─────────────────────────────── */
+    /* GRID MAP */
+    /* ─────────────────────────────── */
+    static void printGridMap(RiverSystem system) {
+        System.out.println("\n=== GRID: " + system.name + " ===\n");
+
+        // Nodes section, classified as generator / load / relay.
+        System.out.println("Nodes (" + system.rivers.size() + "):");
+        int nameWidth = 4;
+        for (String n : system.rivers.keySet()) nameWidth = Math.max(nameWidth, n.length());
+        for (River r : system.rivers.values()) {
+            String tag;
+            if (r.supply > 0) tag = "generator  " + signedFmt(r.supply);
+            else if (r.supply < 0) tag = "load       " + signedFmt(r.supply);
+            else tag = "relay";
+            System.out.println("  " + padRight(r.name, nameWidth) + "  " + tag);
+        }
+        System.out.println();
+
+        // Edges section. In grid mode, arrows are bidirectional.
+        // We reduce duplicate (a,b) pairs; multiple edges sum conductance.
+        Map<String, Double> edgeC = new LinkedHashMap<>();
+        Map<String, String[]> edgeEnds = new LinkedHashMap<>();
+        for (Map.Entry<String, List<RiverSystem.Edge>> entry : system.connections.entrySet()) {
+            for (RiverSystem.Edge e : entry.getValue()) {
+                String a = entry.getKey();
+                String b = e.target;
+                String key = a.compareTo(b) <= 0 ? a + "|" + b : b + "|" + a;
+                edgeC.merge(key, e.weight, Double::sum);
+                edgeEnds.putIfAbsent(key, new String[] { a, b });
+            }
+        }
+        System.out.println("Edges (" + edgeC.size() + "):");
+        for (Map.Entry<String, String[]> entry : edgeEnds.entrySet()) {
+            String[] ends = entry.getValue();
+            double c = edgeC.get(entry.getKey());
+            System.out.println("  " + padRight(ends[0], nameWidth) + " <-> "
+                    + padRight(ends[1], nameWidth) + "   c=" + formatWeight(c));
+        }
+        System.out.println();
+
+        // Supply balance check.
+        double sum = 0;
+        for (River r : system.rivers.values()) sum += r.supply;
+        String tag = Math.abs(sum) < 1e-6 ? " ✓ (balanced)" : " ✗ (unbalanced!)";
+        System.out.println("Net supply: " + formatWeight(sum) + tag);
+        System.out.println();
+    }
+
+    /* ─────────────────────────────── */
+    /* GRID STATE */
+    /* ─────────────────────────────── */
+    static void printGridState(RiverSystem system) {
+        String header = "\n=== GRID STATE: " + system.name + " (" + system.gridTicksRun
+                + " tick" + (system.gridTicksRun == 1 ? "" : "s")
+                + (system.gridConverged ? ", converged" : ", not yet converged")
+                + ") ===\n";
+        System.out.println(header);
+
+        int nameWidth = 5;
+        for (String n : system.gridLevel.keySet()) nameWidth = Math.max(nameWidth, n.length());
+
+        // Levels section
+        System.out.println("Levels:");
+        for (Map.Entry<String, Double> entry : system.gridLevel.entrySet()) {
+            System.out.println("  " + padRight(entry.getKey(), nameWidth) + "  "
+                    + signedFmt(entry.getValue()));
+        }
+        System.out.println();
+
+        // Flows section (positive = first-to-second direction)
+        System.out.println("Flows (positive = first-to-second direction):");
+        for (Map.Entry<String, Double> entry : system.gridFlow.entrySet()) {
+            String[] parts = entry.getKey().split("->");
+            String label = padRight(parts[0], nameWidth) + " -> " + padRight(parts[1], nameWidth);
+            System.out.println("  " + label + "  " + signedFmt(entry.getValue()));
+        }
+        System.out.println();
+    }
+
+    // Signed numeric formatter. Always shows sign for non-zero values so
+    // generator (+) vs load (-) reads at a glance.
+    private static String signedFmt(double v) {
+        if (v > 0) return "+" + String.format("%.2f", v);
+        if (v < 0) return String.format("%.2f", v);
+        return " 0.00";
+    }
+
     private static String formatWeight(double w) {
         if (w == Math.floor(w)) return String.format("%.1f", w);
         // Trim trailing zeros for cleaner display: 0.50 -> 0.5

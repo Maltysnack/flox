@@ -1,0 +1,27 @@
+// MiniGrid: a tiny power network. One generator at the centre supplies
+// two cities through a hub, with a tie-line between the cities for
+// redundancy. Numbers are stylized; "supply" is power injected
+// (generator, +) or consumed (load, -). Edge weights are conductances.
+//
+// In grid mode, arrow direction is ignored: every edge is bidirectional,
+// and flow direction is determined by the levels that emerge from the
+// simulation.
+//
+// Total supply must balance to zero (generators = loads).
+mode grid;
+system MiniGrid;
+
+// Edges (treated bidirectionally; weight = conductance)
+Plant     -[5]-> Hub;
+Hub       -[3]-> NorthCity;
+Hub       -[3]-> SouthCity;
+NorthCity -[1]-> SouthCity;
+
+// Nodes. supply > 0 means generator, supply < 0 means load.
+river Plant     { base: 0, peak: 0, supply:  100 }
+river Hub       { base: 0, peak: 0 }
+river NorthCity { base: 0, peak: 0, supply:  -40 }
+river SouthCity { base: 0, peak: 0, supply:  -60 }
+
+map MiniGrid;
+print MiniGrid 500;

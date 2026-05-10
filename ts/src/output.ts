@@ -297,6 +297,87 @@ export function printMarkovDistribution(o: Output, system: RiverSystem): void {
   o.println("");
 }
 
+export function printGridMap(o: Output, system: RiverSystem): void {
+  o.println("");
+  o.println("=== GRID: " + system.name + " ===\n");
+
+  let nameWidth = 4;
+  for (const n of system.rivers.keys()) {
+    if (n.length > nameWidth) nameWidth = n.length;
+  }
+
+  o.println("Nodes (" + system.rivers.size + "):");
+  for (const r of system.rivers.values()) {
+    let tag: string;
+    if (r.supply > 0) tag = "generator  " + signedFmt(r.supply);
+    else if (r.supply < 0) tag = "load       " + signedFmt(r.supply);
+    else tag = "relay";
+    o.println("  " + padRight(r.name, nameWidth) + "  " + tag);
+  }
+  o.println("");
+
+  // Reduce parallel edges; ignore arrow direction.
+  const edgeC = new Map<string, number>();
+  const edgeEnds = new Map<string, [string, string]>();
+  for (const [from, edges] of system.connections) {
+    for (const e of edges) {
+      const key = from <= e.target ? `${from}|${e.target}` : `${e.target}|${from}`;
+      edgeC.set(key, (edgeC.get(key) ?? 0) + e.weight);
+      if (!edgeEnds.has(key)) edgeEnds.set(key, [from, e.target]);
+    }
+  }
+  o.println("Edges (" + edgeC.size + "):");
+  for (const [key, ends] of edgeEnds) {
+    const c = edgeC.get(key)!;
+    o.println(
+      "  " + padRight(ends[0], nameWidth) + " <-> " +
+      padRight(ends[1], nameWidth) + "   c=" + formatWeight(c),
+    );
+  }
+  o.println("");
+
+  let sum = 0;
+  for (const r of system.rivers.values()) sum += r.supply;
+  const tag = Math.abs(sum) < 1e-6 ? " ✓ (balanced)" : " ✗ (unbalanced!)";
+  o.println("Net supply: " + formatWeight(sum) + tag);
+  o.println("");
+}
+
+export function printGridState(o: Output, system: RiverSystem): void {
+  const tickWord = system.gridTicksRun === 1 ? "tick" : "ticks";
+  const status = system.gridConverged ? ", converged" : ", not yet converged";
+  o.println("");
+  o.println(
+    "=== GRID STATE: " + system.name +
+    " (" + system.gridTicksRun + " " + tickWord + status + ") ===\n",
+  );
+
+  let nameWidth = 5;
+  for (const n of system.gridLevel.keys()) {
+    if (n.length > nameWidth) nameWidth = n.length;
+  }
+
+  o.println("Levels:");
+  for (const [name, lvl] of system.gridLevel) {
+    o.println("  " + padRight(name, nameWidth) + "  " + signedFmt(lvl));
+  }
+  o.println("");
+
+  o.println("Flows (positive = first-to-second direction):");
+  for (const [key, flow] of system.gridFlow) {
+    const parts = key.split("->");
+    const label = padRight(parts[0]!, nameWidth) + " -> " + padRight(parts[1]!, nameWidth);
+    o.println("  " + label + "  " + signedFmt(flow));
+  }
+  o.println("");
+}
+
+function signedFmt(v: number): string {
+  if (v > 0) return "+" + fmtFixed(v, 2);
+  if (v < 0) return fmtFixed(v, 2);
+  return " 0.00";
+}
+
 function formatWeight(w: number): string {
   if (w === Math.floor(w)) return w.toFixed(1);
   let s = w.toFixed(3);

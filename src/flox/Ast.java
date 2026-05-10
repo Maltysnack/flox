@@ -45,17 +45,20 @@ abstract class Ast {
     }
 
     // river Spring { base: 2, peak: 2.0, decay: 0.7 }
+    // 'supply' is an optional grid-mode attribute (default 0).
     public static class River extends Ast {
         public final Token name;
         public final double baseFlow;
         public final double peakMultiplier;
         public final double decayRate;
+        public final double supply;
 
-        public River(Token name, double baseFlow, double peakMultiplier, double decayRate) {
+        public River(Token name, double baseFlow, double peakMultiplier, double decayRate, double supply) {
             this.name = name;
             this.baseFlow = baseFlow;
             this.peakMultiplier = peakMultiplier;
             this.decayRate = decayRate;
+            this.supply = supply;
         }
 
         @Override

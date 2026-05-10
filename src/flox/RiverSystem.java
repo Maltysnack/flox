@@ -3,7 +3,7 @@ package flox;
 import java.util.*;
 
 class RiverSystem {
-    enum Mode { RIVER, MARKOV }
+    enum Mode { RIVER, MARKOV, GRID }
 
     static class Edge {
         final String target;
@@ -27,6 +27,12 @@ class RiverSystem {
     Map<String, double[]> markovHistory = new LinkedHashMap<>(); // node -> mass per tick
     int markovTicksRun = 0;
     boolean markovConverged = false;
+
+    // Grid-mode state.
+    Map<String, Double> gridLevel = new LinkedHashMap<>();
+    Map<String, Double> gridFlow = new LinkedHashMap<>(); // edge "A->B" -> flow A to B
+    int gridTicksRun = 0;
+    boolean gridConverged = false;
 
     RiverSystem(String name) {
         this.name = name;
@@ -227,6 +233,86 @@ class RiverSystem {
                 markovConverged = true;
                 break;
             }
+        }
+    }
+
+    // Grid-mode simulation. Each undirected edge between A and B with
+    // conductance c carries flow (level_A - level_B) * c. Each node has a
+    // 'supply' (positive = injects, negative = draws). The level integrates
+    // (supply + net_inflow) over time with damping factor dt.
+    //
+    // For supplies that sum to zero, the system converges to the unique
+    // (up to constant) solution of the graph Laplacian system. Damping
+    // dt = 0.1 keeps iteration stable for moderately-conditioned graphs.
+    void simulateGrid(int maxTicks) {
+        final double EPSILON = 1e-7;
+        final double DT = 0.1;
+
+        final List<String> nodes = new ArrayList<>(rivers.keySet());
+        nodes.addAll(dams.keySet());
+
+        // Edge list: each entry is one undirected edge {a, b, conductance}.
+        // Direction in the source is ignored (grid mode treats arrows as
+        // bidirectional). Multiple edges between the same pair sum their
+        // conductances.
+        Map<String, Double> edgeC = new LinkedHashMap<>();
+        Map<String, String[]> edgeEnds = new LinkedHashMap<>();
+        for (Map.Entry<String, List<Edge>> entry : connections.entrySet()) {
+            for (Edge e : entry.getValue()) {
+                String a = entry.getKey();
+                String b = e.target;
+                String key = a.compareTo(b) <= 0 ? a + "|" + b : b + "|" + a;
+                edgeC.merge(key, e.weight, Double::sum);
+                edgeEnds.putIfAbsent(key, new String[] { a, b });
+            }
+        }
+
+        gridLevel.clear();
+        for (String n : nodes) gridLevel.put(n, 0.0);
+        gridTicksRun = 0;
+        gridConverged = false;
+
+        for (int t = 1; t <= maxTicks; t++) {
+            Map<String, Double> delta = new LinkedHashMap<>();
+            for (String n : nodes) delta.put(n, 0.0);
+
+            // Each node receives its own supply per tick.
+            for (String n : nodes) {
+                River r = rivers.get(n);
+                double supply = (r != null) ? r.supply : 0;
+                delta.put(n, delta.get(n) + supply);
+            }
+
+            // Edge flows. Positive flow means a->b direction.
+            for (Map.Entry<String, String[]> entry : edgeEnds.entrySet()) {
+                String[] ends = entry.getValue();
+                double c = edgeC.get(entry.getKey());
+                double flow = (gridLevel.get(ends[0]) - gridLevel.get(ends[1])) * c;
+                delta.put(ends[0], delta.get(ends[0]) - flow);
+                delta.put(ends[1], delta.get(ends[1]) + flow);
+            }
+
+            double maxDiff = 0;
+            for (String n : nodes) {
+                double d = DT * delta.get(n);
+                maxDiff = Math.max(maxDiff, Math.abs(d));
+                gridLevel.put(n, gridLevel.get(n) + d);
+            }
+            gridTicksRun = t;
+
+            if (maxDiff < EPSILON) {
+                gridConverged = true;
+                break;
+            }
+        }
+
+        // Compute final flows on each edge (positive = a -> b direction).
+        gridFlow.clear();
+        for (Map.Entry<String, String[]> entry : edgeEnds.entrySet()) {
+            String[] ends = entry.getValue();
+            double c = edgeC.get(entry.getKey());
+            double flow = (gridLevel.get(ends[0]) - gridLevel.get(ends[1])) * c;
+            gridFlow.put(ends[0] + "->" + ends[1], flow);
         }
     }
 }

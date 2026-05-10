@@ -123,13 +123,14 @@ export class Parser {
     const name = this.consume(TokenType.IDENTIFIER, "Expect river name.");
     const attrs = this.parseBlock(name);
     this.consumeOptional(TokenType.SEMICOLON);
-    this.validateAttrs(name, attrs, ["base", "peak"], ["decay"]);
+    this.validateAttrs(name, attrs, ["base", "peak"], ["decay", "supply"]);
     return {
       kind: "RiverDecl",
       name,
       baseFlow: attrs.get("base")!,
       peakMultiplier: attrs.get("peak")!,
       decayRate: attrs.get("decay") ?? 0.7,
+      supply: attrs.get("supply") ?? 0,
     };
   }
 
@@ -232,7 +233,10 @@ export class Parser {
         TokenType.COLON,
         `Expect ':' after attribute name '${key.lexeme}'.`,
       );
+      // Optional unary minus on numeric values (e.g. supply: -40).
+      const negate = this.match(TokenType.DASH);
       let value = this.consumeNumber("Expect number after ':'.");
+      if (negate) value = -value;
       if (this.match(TokenType.PERCENT)) value = value / 100;
       if (attrs.has(key.lexeme)) {
         throw this.errorAt(key, `Duplicate attribute '${key.lexeme}'.`);

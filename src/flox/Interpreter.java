@@ -37,6 +37,7 @@ class Interpreter implements Ast.Visitor<Void> {
             // Per-mode validation pass.
             for (RiverSystem s : systems.values()) {
                 if (s.mode == RiverSystem.Mode.MARKOV) validateMarkov(s);
+                if (s.mode == RiverSystem.Mode.GRID)   validateGrid(s);
             }
 
             // Phase 2: identify roots once per system, then execute actions.
@@ -80,7 +81,7 @@ class Interpreter implements Ast.Visitor<Void> {
                             + currentSystem.name + "'.");
         }
         currentSystem.addRiver(new River(
-                decl.name.lexeme, decl.baseFlow, decl.peakMultiplier, decl.decayRate));
+                decl.name.lexeme, decl.baseFlow, decl.peakMultiplier, decl.decayRate, decl.supply));
         return null;
     }
 
@@ -131,10 +132,12 @@ class Interpreter implements Ast.Visitor<Void> {
             fileMode = RiverSystem.Mode.RIVER;
         } else if (name.equals("markov")) {
             fileMode = RiverSystem.Mode.MARKOV;
+        } else if (name.equals("grid")) {
+            fileMode = RiverSystem.Mode.GRID;
         } else {
             throw new RuntimeException(
                     "Unknown mode '" + name + "' (line " + stmt.mode.line
-                            + "). Known modes: river, markov.");
+                            + "). Known modes: river, markov, grid.");
         }
         return null;
     }
@@ -210,6 +213,30 @@ class Interpreter implements Ast.Visitor<Void> {
         }
     }
 
+    // Grid-mode requirements:
+    //   * Total supply across all nodes must sum to zero (otherwise the
+    //     simulation never reaches a steady state, levels diverge).
+    //   * At least one node has non-zero supply (otherwise nothing
+    //     happens, levels stay at zero forever).
+    private void validateGrid(RiverSystem system) {
+        double total = 0;
+        boolean hasSupply = false;
+        for (River r : system.rivers.values()) {
+            total += r.supply;
+            if (r.supply != 0) hasSupply = true;
+        }
+        if (!hasSupply) {
+            throw new RuntimeException(
+                    "Grid system '" + system.name + "' has no supply set on any node. "
+                            + "Use 'river X { base: 0, peak: 0, supply: N }' for generators (+) or loads (-).");
+        }
+        if (Math.abs(total) > 1e-6) {
+            throw new RuntimeException(
+                    "Grid system '" + system.name + "': supplies do not balance (sum = "
+                            + total + "). Generators (+) and loads (-) must sum to zero.");
+        }
+    }
+
     private boolean nodeDefined(RiverSystem system, String name) {
         return system.rivers.containsKey(name) || system.dams.containsKey(name);
     }
@@ -225,10 +252,10 @@ class Interpreter implements Ast.Visitor<Void> {
     public Void visitMapStmt(Ast.MapStmt stmt) {
         if (phase != Phase.EXECUTE) return null;
         RiverSystem system = lookupSystem(stmt.systemName);
-        if (system.mode == RiverSystem.Mode.MARKOV) {
-            OutputFormatter.printMarkovMap(system);
-        } else {
-            OutputFormatter.printMap(system);
+        switch (system.mode) {
+            case MARKOV: OutputFormatter.printMarkovMap(system); break;
+            case GRID:   OutputFormatter.printGridMap(system);   break;
+            default:     OutputFormatter.printMap(system);       break;
         }
         return null;
     }
@@ -254,6 +281,15 @@ class Interpreter implements Ast.Visitor<Void> {
             }
             system.simulateMarkov(ticks);
             OutputFormatter.printMarkovDistribution(system);
+        } else if (system.mode == RiverSystem.Mode.GRID) {
+            // The number after 'print' is the tick budget. Default 500.
+            int ticks = 500;
+            if (stmt.rainfall != null && stmt.rainfall.length > 0) {
+                ticks = (int) Math.round(stmt.rainfall[0]);
+                if (ticks < 1) ticks = 1;
+            }
+            system.simulateGrid(ticks);
+            OutputFormatter.printGridState(system);
         } else {
             // Default rainfall: 1mm on day 1, dry thereafter.
             double[] rainfall = (stmt.rainfall != null) ? stmt.rainfall : new double[] { 1.0 };

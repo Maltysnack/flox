@@ -5,14 +5,20 @@ class River {
     final double baseFlow;       // L/s
     final double peakMultiplier; // unitless; multiplies rainfall (mm) into flow
     final double decayRate;      // fraction of surge retained each subsequent day
+    final double supply;         // grid mode only: + generator, - load, 0 relay
     double[] dailyFlow;          // L/s, one entry per simulation day
     double totalAccumulated;     // L/s-days, accumulated for terminators
 
     River(String name, double baseFlow, double peakMultiplier, double decayRate) {
+        this(name, baseFlow, peakMultiplier, decayRate, 0);
+    }
+
+    River(String name, double baseFlow, double peakMultiplier, double decayRate, double supply) {
         this.name = name;
         this.baseFlow = baseFlow;
         this.peakMultiplier = peakMultiplier;
         this.decayRate = decayRate;
+        this.supply = supply;
         this.dailyFlow = new double[10];
         this.totalAccumulated = 0;
     }

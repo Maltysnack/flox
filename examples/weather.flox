@@ -1,0 +1,31 @@
+// Sydney weather: a tiny three-state Markov chain. The textbook intro
+// to Markov chains since the 1960s. Transitions are calibrated to
+// Sydney's general pattern (BoM long-run averages: sunny days
+// dominate; rainy spells persist a couple of days when they arrive).
+//
+// The interesting question: in the long run, what fraction of days
+// are sunny / cloudy / rainy? The chain answers that as its
+// stationary distribution.
+mode markov;
+system Sydney;
+
+Sunny  -[0.75]-> Sunny;
+Sunny  -[0.20]-> Cloudy;
+Sunny  -[0.05]-> Rainy;
+
+Cloudy -[0.35]-> Sunny;
+Cloudy -[0.45]-> Cloudy;
+Cloudy -[0.20]-> Rainy;
+
+Rainy  -[0.30]-> Sunny;
+Rainy  -[0.30]-> Cloudy;
+Rainy  -[0.40]-> Rainy;
+
+river Sunny  { base: 0, peak: 0 }
+river Cloudy { base: 0, peak: 0 }
+river Rainy  { base: 0, peak: 0 }
+
+start Sunny 1.0;
+
+map  Sydney;
+print Sydney 200;

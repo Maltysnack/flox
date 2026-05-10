@@ -4,6 +4,8 @@ import { AstNode, Chain } from "./ast.ts";
 import {
   Output,
   printFlowTable,
+  printGridMap,
+  printGridState,
   printHelp,
   printList,
   printMap,
@@ -46,6 +48,7 @@ export class Interpreter {
       // Per-mode validation pass.
       for (const s of this.systems.values()) {
         if (s.mode === "markov") this.validateMarkov(s);
+        if (s.mode === "grid")   this.validateGrid(s);
       }
 
       for (const s of this.systems.values()) s.identifyRoots();
@@ -84,9 +87,10 @@ export class Interpreter {
         const name = stmt.mode.lexeme;
         if (name === "river") this.fileMode = "river";
         else if (name === "markov") this.fileMode = "markov";
+        else if (name === "grid") this.fileMode = "grid";
         else {
           throw new Error(
-            `Unknown mode '${name}' (line ${stmt.mode.line}). Known modes: river, markov.`,
+            `Unknown mode '${name}' (line ${stmt.mode.line}). Known modes: river, markov, grid.`,
           );
         }
         return;
@@ -106,6 +110,7 @@ export class Interpreter {
             stmt.baseFlow,
             stmt.peakMultiplier,
             stmt.decayRate,
+            stmt.supply,
           ),
         );
         return;
@@ -167,6 +172,8 @@ export class Interpreter {
         const sys = this.lookupSystem(stmt.systemName);
         if (sys.mode === "markov") {
           printMarkovMap(new Output(this.out), sys);
+        } else if (sys.mode === "grid") {
+          printGridMap(new Output(this.out), sys);
         } else {
           printMap(new Output(this.out), sys);
         }
@@ -190,6 +197,13 @@ export class Interpreter {
           }
           sys.simulateMarkov(ticks);
           printMarkovDistribution(new Output(this.out), sys);
+        } else if (sys.mode === "grid") {
+          let ticks = 500;
+          if (stmt.rainfall != null && stmt.rainfall.length > 0) {
+            ticks = Math.max(1, Math.round(stmt.rainfall[0]!));
+          }
+          sys.simulateGrid(ticks);
+          printGridState(new Output(this.out), sys);
         } else {
           const rainfall = stmt.rainfall ?? [1.0];
           sys.simulate(rainfall);
@@ -253,6 +267,27 @@ export class Interpreter {
           `Markov system '${system.name}': outgoing weights from '${src}' sum to ${sum}, not 1.0.`,
         );
       }
+    }
+  }
+
+  private validateGrid(system: RiverSystem): void {
+    let total = 0;
+    let hasSupply = false;
+    for (const r of system.rivers.values()) {
+      total += r.supply;
+      if (r.supply !== 0) hasSupply = true;
+    }
+    if (!hasSupply) {
+      throw new Error(
+        `Grid system '${system.name}' has no supply set on any node. ` +
+        `Use 'river X { base: 0, peak: 0, supply: N }' for generators (+) or loads (-).`,
+      );
+    }
+    if (Math.abs(total) > 1e-6) {
+      throw new Error(
+        `Grid system '${system.name}': supplies do not balance (sum = ${total}). ` +
+        `Generators (+) and loads (-) must sum to zero.`,
+      );
     }
   }
 

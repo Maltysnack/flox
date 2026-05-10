@@ -113,6 +113,7 @@ class Parser {
     }
 
     // river Spring { base: 2, peak: 2.0, decay: 0.7 }
+    // 'supply' is an optional grid-mode attribute (default 0).
     private Ast riverDeclaration() {
         Token name = consume(IDENTIFIER, "Expect river name.");
         Map<String, Double> attrs = parseBlock(name);
@@ -120,12 +121,13 @@ class Parser {
 
         validateAttrs(name, attrs,
                 new String[] { "base", "peak" },
-                new String[] { "decay" });
+                new String[] { "decay", "supply" });
 
-        double base  = attrs.get("base");
-        double peak  = attrs.get("peak");
-        double decay = attrs.getOrDefault("decay", 0.7);
-        return new Ast.River(name, base, peak, decay);
+        double base   = attrs.get("base");
+        double peak   = attrs.get("peak");
+        double decay  = attrs.getOrDefault("decay", 0.7);
+        double supply = attrs.getOrDefault("supply", 0.0);
+        return new Ast.River(name, base, peak, decay, supply);
     }
 
     // dam googongDam { capacity: 1000, threshold: 80%, normalRate: 0.8, openRate: 1.2 }
@@ -230,7 +232,10 @@ class Parser {
         while (!check(RIGHT_BRACE) && !isAtEnd()) {
             Token key = consume(IDENTIFIER, "Expect attribute name.");
             consume(COLON, "Expect ':' after attribute name '" + key.lexeme + "'.");
+            // Optional unary minus on numeric values (e.g. supply: -40).
+            boolean negate = match(DASH);
             double value = consumeNumber("Expect number after ':'.");
+            if (negate) value = -value;
             if (match(PERCENT)) value = value / 100.0;
             if (attrs.containsKey(key.lexeme)) {
                 throw error(key, "Duplicate attribute '" + key.lexeme + "'.");

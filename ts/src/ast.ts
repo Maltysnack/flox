@@ -29,6 +29,7 @@ export interface RiverDecl {
   readonly baseFlow: number;
   readonly peakMultiplier: number;
   readonly decayRate: number;
+  readonly supply: number;
 }
 
 export interface DamDecl {

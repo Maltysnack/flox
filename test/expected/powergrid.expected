@@ -1,0 +1,32 @@
+
+=== GRID: MiniGrid ===
+
+Nodes (4):
+  Plant      generator  +100.00
+  Hub        relay
+  NorthCity  load       -40.00
+  SouthCity  load       -60.00
+
+Edges (4):
+  Plant     <-> Hub         c=5.0
+  Hub       <-> NorthCity   c=3.0
+  Hub       <-> SouthCity   c=3.0
+  NorthCity <-> SouthCity   c=1.0
+
+Net supply: 0.0 ✓ (balanced)
+
+
+=== GRID STATE: MiniGrid (37 ticks, converged) ===
+
+Levels:
+  Plant      +23.33
+  Hub        +3.33
+  NorthCity  -11.33
+  SouthCity  -15.33
+
+Flows (positive = first-to-second direction):
+  Plant     -> Hub        +100.00
+  Hub       -> NorthCity  +44.00
+  Hub       -> SouthCity  +56.00
+  NorthCity -> SouthCity  +4.00
+
