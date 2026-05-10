@@ -1,22 +1,28 @@
-// PassOrShoot: a footballer on the edge of the box.
+// PassOrShoot: a footballer in the attacking third.
 // Each "tick" the player either passes again (a quick one-two with a
-// teammate) or pulls the trigger. Once the shot is taken, ~25% of those
-// become goals; the rest miss. Goal and Miss are absorbing states, so
-// running the chain long enough lets all the mass settle there.
+// teammate) or pulls the trigger. Once the shot is taken, the league-
+// average conversion is roughly one goal per ten shots; the rest miss.
+// Goal and Miss are absorbing states, so running the chain long enough
+// lets all the mass settle there.
+//
+// Numbers are calibrated to common football-analytics figures:
+//   * Shot conversion ~10% (Opta, StatsBomb league averages).
+//   * Pass-vs-shoot from the final third: most touches are passes,
+//     not shots; ~15% of attacking-third actions become shots.
 //
 // Markov chains are memoryless: the chance of shooting next doesn't
 // depend on how many passes have already happened. So this model
 // answers "what's my chance of eventually scoring?" but not "what's
 // the optimal number of passes?". For the optimal-passes question see
-// passes_buildup.flox (issue #25).
+// issue #25.
 mode markov;
 system PassOrShoot;
 
-Pass  -[0.7]-> Pass;     // 70% chance of another pass
-Pass  -[0.3]-> Shoot;    // 30% chance of shooting
+Pass  -[0.85]-> Pass;    // 85% of attacking-third touches lead to another pass
+Pass  -[0.15]-> Shoot;   // 15% become shots
 
-Shoot -[0.25]-> Goal;
-Shoot -[0.75]-> Miss;
+Shoot -[0.10]-> Goal;    // ~10% shot conversion (league average)
+Shoot -[0.90]-> Miss;
 
 // Absorbing: mass that arrives stays.
 Goal -[1.0]-> Goal;
@@ -33,4 +39,5 @@ river Miss  { base: 0, peak: 0 }
 start Pass 1.0;
 
 map  PassOrShoot;
-print PassOrShoot 30;
+print PassOrShoot 200;   // converges around tick 118
+

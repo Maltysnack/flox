@@ -5,10 +5,10 @@ States (4):
   Pass, Shoot, Goal, Miss
 
 Transitions:
-  Pass ─[0.7]─▶ Pass
-      └[0.3]─▶ Shoot
-  Shoot ─[0.25]─▶ Goal
-       └[0.75]─▶ Miss
+  Pass ─[0.85]─▶ Pass
+      └[0.15]─▶ Shoot
+  Shoot ─[0.1]─▶ Goal
+       └[0.9]─▶ Miss
   Goal ─[1.0]─▶ Goal
   Miss ─[1.0]─▶ Miss
 
@@ -19,13 +19,13 @@ Outgoing weights per state:
   Miss → 1.000  ✓
 
 
-=== MARKOV DISTRIBUTION: PassOrShoot (30 ticks, not yet converged) ===
+=== MARKOV DISTRIBUTION: PassOrShoot (118 ticks, converged) ===
 
 Final distribution:
   Pass   0.0000
   Shoot  0.0000
-  Goal   0.2500
-  Miss   0.7500
+  Goal   0.1000
+  Miss   0.9000
 
 Total mass: 1.0000
 
