@@ -3,13 +3,16 @@
 import {
   AstNode,
   Chain,
+  ChainEdge,
   DamDecl,
   HelpStmt,
   ListStmt,
   MapStmt,
+  ModeDecl,
   OutletDecl,
   PrintStmt,
   RiverDecl,
+  StartStmt,
   SystemDecl,
 } from "./ast.ts";
 import { Token, TokenType } from "./token.ts";
@@ -35,10 +38,12 @@ export class Parser {
 
   private declaration(): AstNode | null {
     try {
+      if (this.match(TokenType.MODE))   return this.modeDeclaration();
       if (this.match(TokenType.SYSTEM)) return this.systemDeclaration();
       if (this.match(TokenType.RIVER))  return this.riverDeclaration();
       if (this.match(TokenType.DAM))    return this.damDeclaration();
       if (this.match(TokenType.OUTLET)) return this.outletDeclaration();
+      if (this.match(TokenType.START))  return this.startStatement();
       if (this.match(TokenType.MAP))    return this.mapStatement();
       if (this.match(TokenType.LIST))   return this.listStatement();
       if (this.match(TokenType.PRINT))  return this.printStatement();
@@ -51,6 +56,19 @@ export class Parser {
       }
       throw e;
     }
+  }
+
+  private modeDeclaration(): ModeDecl {
+    const name = this.consume(TokenType.IDENTIFIER, "Expect mode name (e.g. river, markov).");
+    this.consume(TokenType.SEMICOLON, "Expect ';' after mode name.");
+    return { kind: "ModeDecl", mode: name };
+  }
+
+  private startStatement(): StartStmt {
+    const node = this.consume(TokenType.IDENTIFIER, "Expect node name after 'start'.");
+    const mass = this.consumeNumber("Expect initial mass after node name in 'start'.");
+    this.consume(TokenType.SEMICOLON, "Expect ';' after start statement.");
+    return { kind: "StartStmt", node, mass };
   }
 
   private systemDeclaration(): SystemDecl {
@@ -155,14 +173,51 @@ export class Parser {
       throw this.errorAt(this.peek(), "Expect declaration or chain.");
     }
     const nodes: Token[] = [];
+    const arrows: ChainEdge[] = [];
     nodes.push(this.advance());
-    while (this.match(TokenType.ARROW)) {
-      nodes.push(
-        this.consume(TokenType.IDENTIFIER, "Expect node name after '->'."),
-      );
+
+    while (this.atArrowStart()) {
+      arrows.push(this.parseArrow());
+      nodes.push(this.consume(TokenType.IDENTIFIER, "Expect node name after arrow."));
     }
     this.consume(TokenType.SEMICOLON, "Expect ';' after chain.");
-    return { kind: "Chain", nodes };
+    return { kind: "Chain", nodes, arrows };
+  }
+
+  private atArrowStart(): boolean {
+    if (this.check(TokenType.ARROW)) return true;
+    if (this.check(TokenType.LARROW)) return true;
+    if (this.check(TokenType.DASH) && this.peekAt(1, TokenType.LEFT_BRACKET)) return true;
+    return false;
+  }
+
+  private parseArrow(): ChainEdge {
+    if (this.match(TokenType.ARROW)) {
+      return { forward: true, weight: null, op: this.previous() };
+    }
+    if (this.match(TokenType.LARROW)) {
+      const op = this.previous();
+      if (this.match(TokenType.LEFT_BRACKET)) {
+        const w = this.consumeNumber("Expect weight number inside arrow brackets.");
+        this.consume(TokenType.RIGHT_BRACKET, "Expect ']' after arrow weight.");
+        this.consume(TokenType.DASH, "Expect '-' to close '<-[w]-' arrow.");
+        return { forward: false, weight: w, op };
+      }
+      return { forward: false, weight: null, op };
+    }
+    // Forward weighted: -[w]->
+    const op = this.consume(TokenType.DASH, "Expect arrow.");
+    this.consume(TokenType.LEFT_BRACKET, "Expect '[' after '-' to start a weighted arrow.");
+    const w = this.consumeNumber("Expect weight number inside arrow brackets.");
+    this.consume(TokenType.RIGHT_BRACKET, "Expect ']' after arrow weight.");
+    this.consume(TokenType.ARROW, "Expect '->' to close '-[w]->' arrow.");
+    return { forward: true, weight: w, op };
+  }
+
+  private peekAt(offset: number, type: TokenType): boolean {
+    const idx = this.current + offset;
+    if (idx >= this.tokens.length) return false;
+    return this.tokens[idx]!.type === type;
   }
 
   private parseBlock(declName: Token): Map<string, number> {
@@ -277,10 +332,12 @@ export class Parser {
     while (!this.isAtEnd()) {
       if (this.previous().type === TokenType.SEMICOLON) return;
       switch (this.peek().type) {
+        case TokenType.MODE:
         case TokenType.SYSTEM:
         case TokenType.RIVER:
         case TokenType.DAM:
         case TokenType.OUTLET:
+        case TokenType.START:
         case TokenType.MAP:
         case TokenType.LIST:
         case TokenType.PRINT:

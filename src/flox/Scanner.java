@@ -18,6 +18,8 @@ class Scanner {
         keywords.put("river", TokenType.RIVER);
         keywords.put("dam", TokenType.DAM);
         keywords.put("outlet", TokenType.OUTLET);
+        keywords.put("mode", TokenType.MODE);
+        keywords.put("start", TokenType.START);
     }
 
     private final String source;
@@ -72,7 +74,16 @@ class Scanner {
                 if (match('>')) {
                     addToken(TokenType.ARROW);
                 } else {
-                    // You could throw an error here if you want
+                    // bare '-' is now a token (used in weighted arrows
+                    // like '-[0.5]->' and the closing '-' of '<-[0.5]-')
+                    addToken(TokenType.DASH);
+                }
+                break;
+            case '<':
+                if (match('-')) {
+                    addToken(TokenType.LARROW);
+                } else {
+                    System.err.println("Unexpected character: < at line " + line);
                 }
                 break;
             case '/':

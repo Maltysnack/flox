@@ -31,11 +31,11 @@ class OutputFormatter {
     static void printList(RiverSystem system) {
         System.out.println("\n=== RIVER SYSTEM: " + system.name + " ===\n");
         System.out.println("Connections:");
-        for (Map.Entry<String, List<String>> entry : system.connections.entrySet()) {
+        for (Map.Entry<String, List<RiverSystem.Edge>> entry : system.connections.entrySet()) {
             String from = entry.getKey();
-            for (String to : entry.getValue()) {
+            for (RiverSystem.Edge e : entry.getValue()) {
                 String fromLabel = system.dams.containsKey(from) ? from + " [DAM]" : from;
-                String toLabel = system.dams.containsKey(to) ? to + " [DAM]" : to;
+                String toLabel = system.dams.containsKey(e.target) ? e.target + " [DAM]" : e.target;
                 System.out.println("  " + padRight(fromLabel, 22) + " →  " + toLabel);
             }
         }
@@ -69,10 +69,10 @@ class OutputFormatter {
         }
 
         // Continue to downstream node(s)
-        List<String> downstream = system.connections.get(node);
+        List<RiverSystem.Edge> downstream = system.connections.get(node);
         if (downstream != null && !downstream.isEmpty()) {
             // Just follow the first downstream path for now
-            tracePath(system, downstream.get(0), path, finalOutlet);
+            tracePath(system, downstream.get(0).target, path, finalOutlet);
         }
     }
 
@@ -220,6 +220,93 @@ class OutputFormatter {
         }
 
         System.out.println();
+    }
+
+    /* ─────────────────────────────── */
+    /* MARKOV CHAIN MAP */
+    /* ─────────────────────────────── */
+    static void printMarkovMap(RiverSystem system) {
+        System.out.println("\n=== MARKOV CHAIN: " + system.name + " ===\n");
+
+        // States section
+        List<String> states = new ArrayList<>(system.rivers.keySet());
+        states.addAll(system.dams.keySet());
+        System.out.println("States (" + states.size() + "):");
+        System.out.println("  " + String.join(", ", states));
+        System.out.println();
+
+        // Transitions section, grouped by source. The first line of each
+        // group is "<src> -[w]-> <target>". Additional outgoing edges from
+        // the same source are indented with "  └[w]-> <target>".
+        System.out.println("Transitions:");
+        for (Map.Entry<String, List<RiverSystem.Edge>> entry : system.connections.entrySet()) {
+            String src = entry.getKey();
+            List<RiverSystem.Edge> outs = entry.getValue();
+            for (int i = 0; i < outs.size(); i++) {
+                RiverSystem.Edge e = outs.get(i);
+                String w = formatWeight(e.weight);
+                if (i == 0) {
+                    System.out.println("  " + src + " ─[" + w + "]─▶ " + e.target);
+                } else {
+                    String pad = " ".repeat(src.length() + 2);
+                    System.out.println(pad + "└[" + w + "]─▶ " + e.target);
+                }
+            }
+        }
+        System.out.println();
+
+        // Sum-of-weights summary (already validated to be 1.0).
+        System.out.println("Outgoing weights per state:");
+        for (String src : states) {
+            List<RiverSystem.Edge> outs = system.connections.get(src);
+            if (outs == null || outs.isEmpty()) {
+                System.out.println("  " + src + " absorbing");
+                continue;
+            }
+            double sum = 0;
+            for (RiverSystem.Edge e : outs) sum += e.weight;
+            String mark = Math.abs(sum - 1.0) < 1e-6 ? "  ✓" : "  ✗";
+            System.out.println("  " + src + " → " + String.format("%.3f", sum) + mark);
+        }
+        System.out.println();
+    }
+
+    /* ─────────────────────────────── */
+    /* MARKOV DISTRIBUTION OUTPUT */
+    /* ─────────────────────────────── */
+    static void printMarkovDistribution(RiverSystem system) {
+        String header = "\n=== MARKOV DISTRIBUTION: " + system.name + " (" + system.markovTicksRun
+                + " tick" + (system.markovTicksRun == 1 ? "" : "s")
+                + (system.markovConverged ? ", converged" : ", not yet converged")
+                + ") ===\n";
+        System.out.println(header);
+
+        // Find the widest state name for nice column alignment.
+        int locWidth = 5;
+        for (String s : system.markovHistory.keySet()) {
+            if (s.length() > locWidth) locWidth = s.length();
+        }
+
+        System.out.println("Final distribution:");
+        double total = 0;
+        for (Map.Entry<String, double[]> entry : system.markovHistory.entrySet()) {
+            double v = entry.getValue()[system.markovTicksRun];
+            total += v;
+            System.out.println("  " + padRight(entry.getKey(), locWidth)
+                    + "  " + String.format("%.4f", v));
+        }
+        System.out.println();
+        System.out.println("Total mass: " + String.format("%.4f", total));
+        System.out.println();
+    }
+
+    private static String formatWeight(double w) {
+        if (w == Math.floor(w)) return String.format("%.1f", w);
+        // Trim trailing zeros for cleaner display: 0.50 -> 0.5
+        String s = String.format("%.3f", w);
+        while (s.endsWith("0")) s = s.substring(0, s.length() - 1);
+        if (s.endsWith(".")) s += "0";
+        return s;
     }
 
     // Render the cumulative outlet volume in the most appropriate unit

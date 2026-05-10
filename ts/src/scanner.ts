@@ -11,6 +11,8 @@ const KEYWORDS: Record<string, TokenType> = {
   river: TokenType.RIVER,
   dam: TokenType.DAM,
   outlet: TokenType.OUTLET,
+  mode: TokenType.MODE,
+  start: TokenType.START,
 };
 
 export class Scanner {
@@ -45,8 +47,20 @@ export class Scanner {
       case "%": this.addToken(TokenType.PERCENT); break;
       case ":": this.addToken(TokenType.COLON); break;
       case "-":
-        if (this.match(">")) this.addToken(TokenType.ARROW);
-        // a bare '-' is currently ignored, matching the Java behaviour
+        if (this.match(">")) {
+          this.addToken(TokenType.ARROW);
+        } else {
+          // bare '-' is now a token (used in weighted arrows like
+          // '-[0.5]->' and the closing '-' of '<-[0.5]-')
+          this.addToken(TokenType.DASH);
+        }
+        break;
+      case "<":
+        if (this.match("-")) {
+          this.addToken(TokenType.LARROW);
+        } else {
+          this.errs.push(`Unexpected character: < at line ${this.line}\n`);
+        }
         break;
       case "/":
         if (this.match("/")) {

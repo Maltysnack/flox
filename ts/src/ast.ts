@@ -7,10 +7,12 @@ import { Token } from "./token.ts";
 
 export type AstNode =
   | SystemDecl
+  | ModeDecl
   | RiverDecl
   | DamDecl
   | OutletDecl
   | Chain
+  | StartStmt
   | MapStmt
   | ListStmt
   | PrintStmt
@@ -43,9 +45,27 @@ export interface OutletDecl {
   readonly name: Token;
 }
 
+export interface ChainEdge {
+  readonly forward: boolean;
+  readonly weight: number | null; // null = unweighted (default 1.0)
+  readonly op: Token;
+}
+
 export interface Chain {
   readonly kind: "Chain";
   readonly nodes: Token[];
+  readonly arrows: ChainEdge[]; // length nodes.length - 1
+}
+
+export interface ModeDecl {
+  readonly kind: "ModeDecl";
+  readonly mode: Token; // identifier: "river" or "markov"
+}
+
+export interface StartStmt {
+  readonly kind: "StartStmt";
+  readonly node: Token;
+  readonly mass: number;
 }
 
 export interface MapStmt {

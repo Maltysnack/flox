@@ -3,11 +3,30 @@ package flox;
 import java.util.*;
 
 class RiverSystem {
+    enum Mode { RIVER, MARKOV }
+
+    static class Edge {
+        final String target;
+        final double weight;
+
+        Edge(String target, double weight) {
+            this.target = target;
+            this.weight = weight;
+        }
+    }
+
     final String name;
+    Mode mode = Mode.RIVER;
     Map<String, River> rivers = new LinkedHashMap<>();
     Map<String, Dam> dams = new LinkedHashMap<>();
-    Map<String, List<String>> connections = new LinkedHashMap<>(); // name -> downstream names; insertion-ordered for stable output
+    Map<String, List<Edge>> connections = new LinkedHashMap<>(); // name -> outgoing edges, insertion-ordered
     List<String> roots = new ArrayList<>(); // Rivers with no upstream
+
+    // Markov-mode state.
+    Map<String, Double> initialMass = new LinkedHashMap<>();
+    Map<String, double[]> markovHistory = new LinkedHashMap<>(); // node -> mass per tick
+    int markovTicksRun = 0;
+    boolean markovConverged = false;
 
     RiverSystem(String name) {
         this.name = name;
@@ -21,15 +40,15 @@ class RiverSystem {
         dams.put(dam.name, dam);
     }
 
-    void addConnection(String from, String to) {
-        connections.computeIfAbsent(from, k -> new ArrayList<>()).add(to);
+    void addConnection(String from, String to, double weight) {
+        connections.computeIfAbsent(from, k -> new ArrayList<>()).add(new Edge(to, weight));
     }
 
     void identifyRoots() {
         roots.clear();
         Set<String> hasUpstream = new HashSet<>();
-        for (List<String> downstream : connections.values()) {
-            hasUpstream.addAll(downstream);
+        for (List<Edge> downstream : connections.values()) {
+            for (Edge e : downstream) hasUpstream.add(e.target);
         }
         // Iterate rivers in declaration (insertion) order. Dams and outlets
         // are excluded as roots: dams always have an upstream, outlets are
@@ -45,8 +64,7 @@ class RiverSystem {
     String getFinalOutlet() {
         for (River river : rivers.values()) {
             if (river.isTerminator()) {
-                // Check if this terminator has no downstream connections
-                List<String> downstream = connections.get(river.name);
+                List<Edge> downstream = connections.get(river.name);
                 if (downstream == null || downstream.isEmpty()) {
                     return river.name;
                 }
@@ -75,10 +93,12 @@ class RiverSystem {
             for (String node : getTopologicalOrder()) {
                 double flow = 0;
 
-                // Get inflow from upstream
-                for (Map.Entry<String, List<String>> entry : connections.entrySet()) {
-                    if (entry.getValue().contains(node)) {
-                        flow += flowThisDay.getOrDefault(entry.getKey(), 0.0);
+                // Get inflow from upstream, weighted per-edge.
+                for (Map.Entry<String, List<Edge>> entry : connections.entrySet()) {
+                    for (Edge e : entry.getValue()) {
+                        if (e.target.equals(node)) {
+                            flow += flowThisDay.getOrDefault(entry.getKey(), 0.0) * e.weight;
+                        }
                     }
                 }
 
@@ -120,9 +140,9 @@ class RiverSystem {
             inDegree.put(node, 0);
         }
 
-        for (List<String> downstream : connections.values()) {
-            for (String node : downstream) {
-                inDegree.put(node, inDegree.getOrDefault(node, 0) + 1);
+        for (List<Edge> downstream : connections.values()) {
+            for (Edge e : downstream) {
+                inDegree.put(e.target, inDegree.getOrDefault(e.target, 0) + 1);
             }
         }
 
@@ -139,9 +159,10 @@ class RiverSystem {
             String node = queue.poll();
             order.add(node);
 
-            List<String> downstream = connections.get(node);
+            List<Edge> downstream = connections.get(node);
             if (downstream != null) {
-                for (String next : downstream) {
+                for (Edge e : downstream) {
+                    String next = e.target;
                     int newDegree = inDegree.get(next) - 1;
                     inDegree.put(next, newDegree);
                     if (newDegree == 0) {
@@ -152,5 +173,60 @@ class RiverSystem {
         }
 
         return order;
+    }
+
+    // Markov-mode simulation. Distributes mass across nodes per-tick by
+    // multiplying current state vector by the (row-stochastic) transition
+    // matrix induced by the edge weights. Halts at maxTicks or when the
+    // state stops changing within EPSILON.
+    void simulateMarkov(int maxTicks) {
+        final double EPSILON = 1e-9;
+        final List<String> nodes = new ArrayList<>(rivers.keySet());
+        nodes.addAll(dams.keySet());
+
+        // Initial state vector
+        Map<String, Double> mass = new LinkedHashMap<>();
+        for (String n : nodes) mass.put(n, initialMass.getOrDefault(n, 0.0));
+
+        // Record per-tick history (tick 0 = initial)
+        markovHistory.clear();
+        for (String n : nodes) {
+            double[] hist = new double[maxTicks + 1];
+            hist[0] = mass.get(n);
+            markovHistory.put(n, hist);
+        }
+        markovTicksRun = 0;
+        markovConverged = false;
+
+        for (int t = 1; t <= maxTicks; t++) {
+            Map<String, Double> next = new LinkedHashMap<>();
+            for (String n : nodes) next.put(n, 0.0);
+
+            for (String src : nodes) {
+                List<Edge> outs = connections.get(src);
+                if (outs == null || outs.isEmpty()) {
+                    // Dangling node: keep its mass put.
+                    next.put(src, next.get(src) + mass.get(src));
+                    continue;
+                }
+                for (Edge e : outs) {
+                    if (!next.containsKey(e.target)) continue;
+                    next.put(e.target, next.get(e.target) + mass.get(src) * e.weight);
+                }
+            }
+
+            double maxDiff = 0;
+            for (String n : nodes) {
+                maxDiff = Math.max(maxDiff, Math.abs(next.get(n) - mass.get(n)));
+                markovHistory.get(n)[t] = next.get(n);
+            }
+            mass = next;
+            markovTicksRun = t;
+
+            if (maxDiff < EPSILON) {
+                markovConverged = true;
+                break;
+            }
+        }
     }
 }

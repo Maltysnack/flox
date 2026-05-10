@@ -1,8 +1,16 @@
 // Two-pass interpreter. Mechanical port of Interpreter.java.
 
 import { AstNode, Chain } from "./ast.ts";
-import { Output, printFlowTable, printHelp, printList, printMap } from "./output.ts";
-import { Dam, River, RiverSystem } from "./runtime.ts";
+import {
+  Output,
+  printFlowTable,
+  printHelp,
+  printList,
+  printMap,
+  printMarkovDistribution,
+  printMarkovMap,
+} from "./output.ts";
+import { Dam, Edge, Mode, River, RiverSystem } from "./runtime.ts";
 import { Token } from "./token.ts";
 
 enum Phase {
@@ -12,10 +20,10 @@ enum Phase {
 
 export class Interpreter {
   private readonly systems = new Map<string, RiverSystem>();
-  // Per-system pending chains, kept between phases.
-  private readonly pendingChains = new Map<string, Token[][]>();
+  private readonly pendingChains = new Map<string, Chain[]>();
   private currentSystem: RiverSystem | null = null;
   private phase: Phase = Phase.COLLECT;
+  private fileMode: Mode = "river";
 
   constructor(
     private readonly out: string[],
@@ -29,8 +37,19 @@ export class Interpreter {
       for (const stmt of statements) {
         if (stmt) this.execute(stmt);
       }
+
+      // Apply file mode to every system before resolution.
+      for (const s of this.systems.values()) s.mode = this.fileMode;
+
       this.resolveChains();
+
+      // Per-mode validation pass.
+      for (const s of this.systems.values()) {
+        if (s.mode === "markov") this.validateMarkov(s);
+      }
+
       for (const s of this.systems.values()) s.identifyRoots();
+
       this.phase = Phase.EXECUTE;
       this.currentSystem = null;
       for (const stmt of statements) {
@@ -56,6 +75,19 @@ export class Interpreter {
           this.currentSystem = s;
         } else {
           this.currentSystem = this.systems.get(name) ?? null;
+        }
+        return;
+      }
+
+      case "ModeDecl": {
+        if (this.phase !== Phase.COLLECT) return;
+        const name = stmt.mode.lexeme;
+        if (name === "river") this.fileMode = "river";
+        else if (name === "markov") this.fileMode = "markov";
+        else {
+          throw new Error(
+            `Unknown mode '${name}' (line ${stmt.mode.line}). Known modes: river, markov.`,
+          );
         }
         return;
       }
@@ -107,7 +139,6 @@ export class Interpreter {
             `Node '${stmt.name.lexeme}' is declared more than once in system '${sys.name}'.`,
           );
         }
-        // Outlets stored as zero-flow rivers (matches Java's River.isTerminator()).
         sys.addRiver(new River(stmt.name.lexeme, 0, 0, 0.7));
         return;
       }
@@ -117,15 +148,28 @@ export class Interpreter {
         const sys = this.requireSystem(
           stmt.nodes.length > 0 ? stmt.nodes[0]! : null,
         );
-        const list = this.pendingChains.get(sys.name)!;
-        list.push(stmt.nodes);
+        this.pendingChains.get(sys.name)!.push(stmt);
+        return;
+      }
+
+      case "StartStmt": {
+        if (this.phase !== Phase.COLLECT) return;
+        const sys = this.requireSystem(stmt.node);
+        sys.initialMass.set(
+          stmt.node.lexeme,
+          (sys.initialMass.get(stmt.node.lexeme) ?? 0) + stmt.mass,
+        );
         return;
       }
 
       case "MapStmt": {
         if (this.phase !== Phase.EXECUTE) return;
         const sys = this.lookupSystem(stmt.systemName);
-        printMap(new Output(this.out), sys);
+        if (sys.mode === "markov") {
+          printMarkovMap(new Output(this.out), sys);
+        } else {
+          printMap(new Output(this.out), sys);
+        }
         return;
       }
 
@@ -139,9 +183,18 @@ export class Interpreter {
       case "PrintStmt": {
         if (this.phase !== Phase.EXECUTE) return;
         const sys = this.lookupSystem(stmt.systemName);
-        const rainfall = stmt.rainfall ?? [1.0];
-        sys.simulate(rainfall);
-        printFlowTable(new Output(this.out), sys, rainfall);
+        if (sys.mode === "markov") {
+          let ticks = 30;
+          if (stmt.rainfall != null && stmt.rainfall.length > 0) {
+            ticks = Math.max(1, Math.round(stmt.rainfall[0]!));
+          }
+          sys.simulateMarkov(ticks);
+          printMarkovDistribution(new Output(this.out), sys);
+        } else {
+          const rainfall = stmt.rainfall ?? [1.0];
+          sys.simulate(rainfall);
+          printFlowTable(new Output(this.out), sys, rainfall);
+        }
         return;
       }
 
@@ -157,16 +210,48 @@ export class Interpreter {
     for (const [sysName, chains] of this.pendingChains) {
       const system = this.systems.get(sysName)!;
       for (const chain of chains) {
-        for (const name of chain) {
+        for (const name of chain.nodes) {
           if (!this.nodeDefined(system, name.lexeme)) {
             throw new Error(
               `Chain references undeclared node '${name.lexeme}' (line ${name.line}) in system '${system.name}'.`,
             );
           }
         }
-        for (let i = 0; i + 1 < chain.length; i++) {
-          system.addConnection(chain[i]!.lexeme, chain[i + 1]!.lexeme);
+        for (let i = 0; i + 1 < chain.nodes.length; i++) {
+          const arrow = chain.arrows[i]!;
+          const a = chain.nodes[i]!;
+          const b = chain.nodes[i + 1]!;
+          const from = arrow.forward ? a : b;
+          const to = arrow.forward ? b : a;
+          const weight = arrow.weight != null ? arrow.weight : 1.0;
+          system.addConnection(from.lexeme, to.lexeme, weight);
         }
+      }
+    }
+  }
+
+  private validateMarkov(system: RiverSystem): void {
+    for (const name of system.initialMass.keys()) {
+      if (!this.nodeDefined(system, name)) {
+        throw new Error(
+          `start references undeclared node '${name}' in system '${system.name}'.`,
+        );
+      }
+    }
+    let totalInitial = 0;
+    for (const m of system.initialMass.values()) totalInitial += m;
+    if (totalInitial === 0) {
+      throw new Error(
+        `Markov system '${system.name}' has no initial mass. Use 'start NodeName 1.0;' to set one.`,
+      );
+    }
+    for (const [src, edges] of system.connections) {
+      let sum = 0;
+      for (const e of edges) sum += e.weight;
+      if (Math.abs(sum - 1.0) > 1e-6) {
+        throw new Error(
+          `Markov system '${system.name}': outgoing weights from '${src}' sum to ${sum}, not 1.0.`,
+        );
       }
     }
   }

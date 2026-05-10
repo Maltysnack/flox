@@ -10,9 +10,11 @@ export enum TokenType {
   RIGHT_BRACE = "RIGHT_BRACE",
   PERCENT = "PERCENT",
   COLON = "COLON",
+  DASH = "DASH",
 
   // One or two character tokens
   ARROW = "ARROW",
+  LARROW = "LARROW",
 
   // Literals
   IDENTIFIER = "IDENTIFIER",
@@ -27,6 +29,8 @@ export enum TokenType {
   RIVER = "RIVER",
   DAM = "DAM",
   OUTLET = "OUTLET",
+  MODE = "MODE",
+  START = "START",
 
   EOF = "EOF",
 }

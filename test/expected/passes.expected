@@ -1,0 +1,31 @@
+
+=== MARKOV CHAIN: PassOrShoot ===
+
+States (4):
+  Pass, Shoot, Goal, Miss
+
+Transitions:
+  Pass ─[0.7]─▶ Pass
+      └[0.3]─▶ Shoot
+  Shoot ─[0.25]─▶ Goal
+       └[0.75]─▶ Miss
+  Goal ─[1.0]─▶ Goal
+  Miss ─[1.0]─▶ Miss
+
+Outgoing weights per state:
+  Pass → 1.000  ✓
+  Shoot → 1.000  ✓
+  Goal → 1.000  ✓
+  Miss → 1.000  ✓
+
+
+=== MARKOV DISTRIBUTION: PassOrShoot (30 ticks, not yet converged) ===
+
+Final distribution:
+  Pass   0.0000
+  Shoot  0.0000
+  Goal   0.2500
+  Miss   0.7500
+
+Total mass: 1.0000
+

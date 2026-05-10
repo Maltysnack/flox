@@ -80,13 +80,25 @@ export class Dam {
   }
 }
 
+export type Mode = "river" | "markov";
+
+export interface Edge {
+  target: string;
+  weight: number;
+}
+
 export class RiverSystem {
-  // Insertion-ordered, like Java's LinkedHashMap.
+  mode: Mode = "river";
   rivers: Map<string, River> = new Map();
   dams: Map<string, Dam> = new Map();
-  // name -> downstream names
-  connections: Map<string, string[]> = new Map();
+  connections: Map<string, Edge[]> = new Map();
   roots: string[] = [];
+
+  // Markov state
+  initialMass: Map<string, number> = new Map();
+  markovHistory: Map<string, number[]> = new Map();
+  markovTicksRun = 0;
+  markovConverged = false;
 
   constructor(readonly name: string) {}
 
@@ -98,24 +110,21 @@ export class RiverSystem {
     this.dams.set(dam.name, dam);
   }
 
-  addConnection(from: string, to: string): void {
+  addConnection(from: string, to: string, weight: number): void {
     let downstream = this.connections.get(from);
     if (!downstream) {
       downstream = [];
       this.connections.set(from, downstream);
     }
-    downstream.push(to);
+    downstream.push({ target: to, weight });
   }
 
   identifyRoots(): void {
     this.roots = [];
     const hasUpstream = new Set<string>();
-    for (const downstream of this.connections.values()) {
-      for (const n of downstream) hasUpstream.add(n);
+    for (const edges of this.connections.values()) {
+      for (const e of edges) hasUpstream.add(e.target);
     }
-    // Iterate rivers in declaration (insertion) order. Dams and outlets
-    // are excluded as roots: dams always have an upstream, outlets are
-    // terminators.
     for (const r of this.rivers.values()) {
       if (!hasUpstream.has(r.name) && !r.isTerminator()) {
         this.roots.push(r.name);
@@ -143,9 +152,11 @@ export class RiverSystem {
       for (const node of this.getTopologicalOrder()) {
         let flow = 0;
 
-        for (const [from, downstream] of this.connections) {
-          if (downstream.includes(node)) {
-            flow += flowThisDay.get(from) ?? 0;
+        for (const [from, edges] of this.connections) {
+          for (const e of edges) {
+            if (e.target === node) {
+              flow += (flowThisDay.get(from) ?? 0) * e.weight;
+            }
           }
         }
 
@@ -168,6 +179,56 @@ export class RiverSystem {
     }
   }
 
+  // Markov-mode simulation: row-stochastic transition matrix induced by
+  // edge weights, applied iteratively to the state vector. Halts at
+  // maxTicks or when the state stops changing within EPSILON.
+  simulateMarkov(maxTicks: number): void {
+    const EPSILON = 1e-9;
+    const nodes: string[] = [...this.rivers.keys(), ...this.dams.keys()];
+
+    let mass = new Map<string, number>();
+    for (const n of nodes) mass.set(n, this.initialMass.get(n) ?? 0);
+
+    this.markovHistory.clear();
+    for (const n of nodes) {
+      const hist: number[] = new Array(maxTicks + 1).fill(0);
+      hist[0] = mass.get(n)!;
+      this.markovHistory.set(n, hist);
+    }
+    this.markovTicksRun = 0;
+    this.markovConverged = false;
+
+    for (let t = 1; t <= maxTicks; t++) {
+      const next = new Map<string, number>();
+      for (const n of nodes) next.set(n, 0);
+
+      for (const src of nodes) {
+        const outs = this.connections.get(src);
+        if (!outs || outs.length === 0) {
+          next.set(src, (next.get(src) ?? 0) + (mass.get(src) ?? 0));
+          continue;
+        }
+        for (const e of outs) {
+          if (!next.has(e.target)) continue;
+          next.set(e.target, (next.get(e.target) ?? 0) + (mass.get(src) ?? 0) * e.weight);
+        }
+      }
+
+      let maxDiff = 0;
+      for (const n of nodes) {
+        maxDiff = Math.max(maxDiff, Math.abs(next.get(n)! - mass.get(n)!));
+        this.markovHistory.get(n)![t] = next.get(n)!;
+      }
+      mass = next;
+      this.markovTicksRun = t;
+
+      if (maxDiff < EPSILON) {
+        this.markovConverged = true;
+        break;
+      }
+    }
+  }
+
   private getTopologicalOrder(): string[] {
     const order: string[] = [];
     const inDegree = new Map<string, number>();
@@ -176,9 +237,9 @@ export class RiverSystem {
       ...this.dams.keys(),
     ]);
     for (const n of allNodes) inDegree.set(n, 0);
-    for (const downstream of this.connections.values()) {
-      for (const n of downstream) {
-        inDegree.set(n, (inDegree.get(n) ?? 0) + 1);
+    for (const edges of this.connections.values()) {
+      for (const e of edges) {
+        inDegree.set(e.target, (inDegree.get(e.target) ?? 0) + 1);
       }
     }
     const queue: string[] = [];
@@ -188,12 +249,12 @@ export class RiverSystem {
     while (queue.length > 0) {
       const node = queue.shift()!;
       order.push(node);
-      const downstream = this.connections.get(node);
-      if (downstream) {
-        for (const next of downstream) {
-          const d = (inDegree.get(next) ?? 0) - 1;
-          inDegree.set(next, d);
-          if (d === 0) queue.push(next);
+      const edges = this.connections.get(node);
+      if (edges) {
+        for (const e of edges) {
+          const d = (inDegree.get(e.target) ?? 0) - 1;
+          inDegree.set(e.target, d);
+          if (d === 0) queue.push(e.target);
         }
       }
     }

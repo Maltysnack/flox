@@ -7,6 +7,8 @@ abstract class Ast {
     public interface Visitor<R> {
         R visitSystemDecl(SystemDecl stmt);
 
+        R visitModeDecl(ModeDecl stmt);
+
         R visitRiverDecl(River decl);
 
         R visitDamDecl(Dam decl);
@@ -14,6 +16,8 @@ abstract class Ast {
         R visitOutletDecl(Outlet decl);
 
         R visitChain(Chain chain);
+
+        R visitStartStmt(StartStmt stmt);
 
         R visitMapStmt(MapStmt stmt);
 
@@ -96,17 +100,65 @@ abstract class Ast {
         }
     }
 
-    // A -> B -> C;  (pure references)
+    // A -> B -[0.5]-> C <- D;
+    // arrows[i] connects nodes[i] and nodes[i+1]; arrows.size() == nodes.size()-1.
     public static class Chain extends Ast {
         public final List<Token> nodes;
+        public final List<ChainEdge> arrows;
 
-        public Chain(List<Token> nodes) {
+        public Chain(List<Token> nodes, List<ChainEdge> arrows) {
             this.nodes = nodes;
+            this.arrows = arrows;
         }
 
         @Override
         public <R> R accept(Visitor<R> visitor) {
             return visitor.visitChain(this);
+        }
+    }
+
+    // One arrow inside a chain. forward=true means left-to-right (->),
+    // forward=false means right-to-left (<-). weight is null when the
+    // arrow is unweighted (the default).
+    public static class ChainEdge {
+        public final boolean forward;
+        public final Double weight;
+        public final Token op; // for error reporting
+
+        public ChainEdge(boolean forward, Double weight, Token op) {
+            this.forward = forward;
+            this.weight = weight;
+            this.op = op;
+        }
+    }
+
+    // mode river;  /  mode markov;
+    public static class ModeDecl extends Ast {
+        public final Token mode; // identifier token: "river" or "markov"
+
+        public ModeDecl(Token mode) {
+            this.mode = mode;
+        }
+
+        @Override
+        public <R> R accept(Visitor<R> visitor) {
+            return visitor.visitModeDecl(this);
+        }
+    }
+
+    // start NodeName 1.0;
+    public static class StartStmt extends Ast {
+        public final Token node;
+        public final double mass;
+
+        public StartStmt(Token node, double mass) {
+            this.node = node;
+            this.mass = mass;
+        }
+
+        @Override
+        public <R> R accept(Visitor<R> visitor) {
+            return visitor.visitStartStmt(this);
         }
     }
 

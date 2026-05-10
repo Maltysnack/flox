@@ -5,12 +5,14 @@ import java.util.*;
 class Interpreter implements Ast.Visitor<Void> {
     private final Map<String, RiverSystem> systems = new LinkedHashMap<>();
 
-    // Per-system pending chain edges, kept between phases.
-    // Each entry is one chain: a list of (token) names in source order.
-    private final Map<String, List<List<Token>>> pendingChains = new HashMap<>();
+    // Per-system pending chains, kept between phases.
+    private final Map<String, List<Ast.Chain>> pendingChains = new HashMap<>();
 
     private RiverSystem currentSystem = null;
     private Phase phase = Phase.COLLECT;
+    // File-level mode. Set by `mode <name>;`. Applied to every system at
+    // the end of phase 1. Default is RIVER.
+    private RiverSystem.Mode fileMode = RiverSystem.Mode.RIVER;
 
     private enum Phase {
         COLLECT,  // gather declarations and chains
@@ -26,8 +28,16 @@ class Interpreter implements Ast.Visitor<Void> {
                 if (stmt != null) execute(stmt);
             }
 
+            // Apply file mode to every system before resolution.
+            for (RiverSystem s : systems.values()) s.mode = fileMode;
+
             // Resolve: wire up pending chains against each system's symbol table.
             resolveChains();
+
+            // Per-mode validation pass.
+            for (RiverSystem s : systems.values()) {
+                if (s.mode == RiverSystem.Mode.MARKOV) validateMarkov(s);
+            }
 
             // Phase 2: identify roots once per system, then execute actions.
             for (RiverSystem s : systems.values()) {
@@ -109,16 +119,43 @@ class Interpreter implements Ast.Visitor<Void> {
     public Void visitChain(Ast.Chain chain) {
         if (phase != Phase.COLLECT) return null;
         requireSystem(chain.nodes.isEmpty() ? null : chain.nodes.get(0));
-        pendingChains.get(currentSystem.name).add(chain.nodes);
+        pendingChains.get(currentSystem.name).add(chain);
+        return null;
+    }
+
+    @Override
+    public Void visitModeDecl(Ast.ModeDecl stmt) {
+        if (phase != Phase.COLLECT) return null;
+        String name = stmt.mode.lexeme;
+        if (name.equals("river")) {
+            fileMode = RiverSystem.Mode.RIVER;
+        } else if (name.equals("markov")) {
+            fileMode = RiverSystem.Mode.MARKOV;
+        } else {
+            throw new RuntimeException(
+                    "Unknown mode '" + name + "' (line " + stmt.mode.line
+                            + "). Known modes: river, markov.");
+        }
+        return null;
+    }
+
+    @Override
+    public Void visitStartStmt(Ast.StartStmt stmt) {
+        if (phase != Phase.COLLECT) return null;
+        requireSystem(stmt.node);
+        // start statements are valid in any mode but only used by markov.
+        // We accumulate so multiple `start A 0.4; start A 0.6;` are equivalent
+        // to one `start A 1.0;`.
+        currentSystem.initialMass.merge(stmt.node.lexeme, stmt.mass, Double::sum);
         return null;
     }
 
     private void resolveChains() {
-        for (Map.Entry<String, List<List<Token>>> entry : pendingChains.entrySet()) {
+        for (Map.Entry<String, List<Ast.Chain>> entry : pendingChains.entrySet()) {
             RiverSystem system = systems.get(entry.getKey());
-            for (List<Token> chain : entry.getValue()) {
+            for (Ast.Chain chain : entry.getValue()) {
                 // Validate every name in the chain is declared.
-                for (Token name : chain) {
+                for (Token name : chain.nodes) {
                     if (!nodeDefined(system, name.lexeme)) {
                         throw new RuntimeException(
                                 "Chain references undeclared node '" + name.lexeme
@@ -126,10 +163,49 @@ class Interpreter implements Ast.Visitor<Void> {
                                         + system.name + "'.");
                     }
                 }
-                // Wire up pairs.
-                for (int i = 0; i + 1 < chain.size(); i++) {
-                    system.addConnection(chain.get(i).lexeme, chain.get(i + 1).lexeme);
+                // Wire up edges. Arrow direction decides (from, to); arrow
+                // weight decides edge weight (default 1.0 if absent).
+                for (int i = 0; i + 1 < chain.nodes.size(); i++) {
+                    Ast.ChainEdge arrow = chain.arrows.get(i);
+                    Token a = chain.nodes.get(i);
+                    Token b = chain.nodes.get(i + 1);
+                    Token from = arrow.forward ? a : b;
+                    Token to   = arrow.forward ? b : a;
+                    double weight = arrow.weight != null ? arrow.weight : 1.0;
+                    system.addConnection(from.lexeme, to.lexeme, weight);
                 }
+            }
+        }
+    }
+
+    // Markov-mode requirements:
+    //   * Every initial-mass entry refers to a declared node.
+    //   * For each node with outgoing edges, the weights sum to 1.0.
+    //   * At least one node has non-zero initial mass.
+    private void validateMarkov(RiverSystem system) {
+        for (String name : system.initialMass.keySet()) {
+            if (!nodeDefined(system, name)) {
+                throw new RuntimeException(
+                        "start references undeclared node '" + name
+                                + "' in system '" + system.name + "'.");
+            }
+        }
+        double totalInitial = 0;
+        for (double m : system.initialMass.values()) totalInitial += m;
+        if (totalInitial == 0) {
+            throw new RuntimeException(
+                    "Markov system '" + system.name
+                            + "' has no initial mass. Use 'start NodeName 1.0;' to set one.");
+        }
+
+        for (Map.Entry<String, List<RiverSystem.Edge>> entry : system.connections.entrySet()) {
+            String src = entry.getKey();
+            double sum = 0;
+            for (RiverSystem.Edge e : entry.getValue()) sum += e.weight;
+            if (Math.abs(sum - 1.0) > 1e-6) {
+                throw new RuntimeException(
+                        "Markov system '" + system.name + "': outgoing weights from '"
+                                + src + "' sum to " + sum + ", not 1.0.");
             }
         }
     }
@@ -149,7 +225,11 @@ class Interpreter implements Ast.Visitor<Void> {
     public Void visitMapStmt(Ast.MapStmt stmt) {
         if (phase != Phase.EXECUTE) return null;
         RiverSystem system = lookupSystem(stmt.systemName);
-        OutputFormatter.printMap(system);
+        if (system.mode == RiverSystem.Mode.MARKOV) {
+            OutputFormatter.printMarkovMap(system);
+        } else {
+            OutputFormatter.printMap(system);
+        }
         return null;
     }
 
@@ -165,10 +245,21 @@ class Interpreter implements Ast.Visitor<Void> {
     public Void visitPrintStmt(Ast.PrintStmt stmt) {
         if (phase != Phase.EXECUTE) return null;
         RiverSystem system = lookupSystem(stmt.systemName);
-        // Default: 1mm on day 1, dry thereafter.
-        double[] rainfall = (stmt.rainfall != null) ? stmt.rainfall : new double[] { 1.0 };
-        system.simulate(rainfall);
-        OutputFormatter.printFlowTable(system, rainfall);
+        if (system.mode == RiverSystem.Mode.MARKOV) {
+            // The number after 'print' is the tick budget. Default 30.
+            int ticks = 30;
+            if (stmt.rainfall != null && stmt.rainfall.length > 0) {
+                ticks = (int) Math.round(stmt.rainfall[0]);
+                if (ticks < 1) ticks = 1;
+            }
+            system.simulateMarkov(ticks);
+            OutputFormatter.printMarkovDistribution(system);
+        } else {
+            // Default rainfall: 1mm on day 1, dry thereafter.
+            double[] rainfall = (stmt.rainfall != null) ? stmt.rainfall : new double[] { 1.0 };
+            system.simulate(rainfall);
+            OutputFormatter.printFlowTable(system, rainfall);
+        }
         return null;
     }
 

@@ -29,11 +29,13 @@ class Parser {
 
     private Ast declaration() {
         try {
+            if (match(MODE))     return modeDeclaration();
             if (match(SYSTEM))   return systemDeclaration();
             if (match(RIVER))    return riverDeclaration();
             if (match(DAM))      return damDeclaration();
             if (match(OUTLET))   return outletDeclaration();
-            if (match(MAP))     return mapStatement();
+            if (match(START))    return startStatement();
+            if (match(MAP))      return mapStatement();
             if (match(LIST))     return listStatement();
             if (match(PRINT))    return printStatement();
             if (match(HELP))     return helpStatement();
@@ -95,6 +97,21 @@ class Parser {
         return new Ast.HelpStmt();
     }
 
+    // mode river;   or   mode markov;
+    private Ast modeDeclaration() {
+        Token name = consume(IDENTIFIER, "Expect mode name (e.g. river, markov).");
+        consume(SEMICOLON, "Expect ';' after mode name.");
+        return new Ast.ModeDecl(name);
+    }
+
+    // start NodeName 1.0;
+    private Ast startStatement() {
+        Token node = consume(IDENTIFIER, "Expect node name after 'start'.");
+        double mass = consumeNumber("Expect initial mass after node name in 'start'.");
+        consume(SEMICOLON, "Expect ';' after start statement.");
+        return new Ast.StartStmt(node, mass);
+    }
+
     // river Spring { base: 2, peak: 2.0, decay: 0.7 }
     private Ast riverDeclaration() {
         Token name = consume(IDENTIFIER, "Expect river name.");
@@ -141,19 +158,68 @@ class Parser {
         return new Ast.Outlet(name);
     }
 
-    // A chain is one or more bare identifiers joined by ->.
-    // A -> B -> C;
+    // A chain is one or more bare identifiers joined by arrows.
+    // The four arrow forms:
+    //   ->        forward, default weight 1
+    //   <-        backward, default weight 1
+    //   -[w]->    forward, weight w
+    //   <-[w]-    backward, weight w
     private Ast chain() {
         if (!check(IDENTIFIER)) {
             throw error(peek(), "Expect declaration or chain.");
         }
         List<Token> nodes = new ArrayList<>();
+        List<Ast.ChainEdge> arrows = new ArrayList<>();
         nodes.add(advance());
-        while (match(ARROW)) {
-            nodes.add(consume(IDENTIFIER, "Expect node name after '->'."));
+
+        while (atArrowStart()) {
+            Ast.ChainEdge arrow = parseArrow();
+            arrows.add(arrow);
+            nodes.add(consume(IDENTIFIER, "Expect node name after arrow."));
         }
         consume(SEMICOLON, "Expect ';' after chain.");
-        return new Ast.Chain(nodes);
+        return new Ast.Chain(nodes, arrows);
+    }
+
+    // The four arrow forms each start in a recognisable way:
+    //   ARROW      ->        forward, no weight
+    //   LARROW     <-        backward, no weight (or start of <-[w]-)
+    //   DASH '['   -[w]->    forward, with weight
+    private boolean atArrowStart() {
+        if (check(ARROW)) return true;
+        if (check(LARROW)) return true;
+        if (check(DASH) && peekIs(1, LEFT_BRACKET)) return true;
+        return false;
+    }
+
+    private Ast.ChainEdge parseArrow() {
+        if (match(ARROW)) {
+            return new Ast.ChainEdge(true, null, previous());
+        }
+        if (match(LARROW)) {
+            // either bare <-, or <-[w]-
+            Token op = previous();
+            if (match(LEFT_BRACKET)) {
+                double w = consumeNumber("Expect weight number inside arrow brackets.");
+                consume(RIGHT_BRACKET, "Expect ']' after arrow weight.");
+                consume(DASH, "Expect '-' to close '<-[w]-' arrow.");
+                return new Ast.ChainEdge(false, w, op);
+            }
+            return new Ast.ChainEdge(false, null, op);
+        }
+        // Forward weighted arrow: -[w]->
+        Token op = consume(DASH, "Expect arrow.");
+        consume(LEFT_BRACKET, "Expect '[' after '-' to start a weighted arrow.");
+        double w = consumeNumber("Expect weight number inside arrow brackets.");
+        consume(RIGHT_BRACKET, "Expect ']' after arrow weight.");
+        consume(ARROW, "Expect '->' to close '-[w]->' arrow.");
+        return new Ast.ChainEdge(true, w, op);
+    }
+
+    private boolean peekIs(int offset, TokenType type) {
+        int idx = current + offset;
+        if (idx >= tokens.size()) return false;
+        return tokens.get(idx).type == type;
     }
 
     // { key: value (, key: value)* }   ,/whitespace flexible, trailing comma allowed
@@ -252,10 +318,12 @@ class Parser {
         while (!isAtEnd()) {
             if (previous().type == SEMICOLON) return;
             switch (peek().type) {
+                case MODE:
                 case SYSTEM:
                 case RIVER:
                 case DAM:
                 case OUTLET:
+                case START:
                 case MAP:
                 case LIST:
                 case PRINT:

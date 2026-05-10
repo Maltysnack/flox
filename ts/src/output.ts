@@ -4,7 +4,7 @@
 // includes any newline). The caller (CLI or interpret() API) joins and
 // directs to stdout / a string buffer.
 
-import { Dam, River, RiverSystem } from "./runtime.ts";
+import { Dam, Edge, River, RiverSystem } from "./runtime.ts";
 
 export class Output {
   constructor(private readonly out: string[]) {}
@@ -39,10 +39,10 @@ export function printList(o: Output, system: RiverSystem): void {
   o.println("");
   o.println("=== RIVER SYSTEM: " + system.name + " ===\n");
   o.println("Connections:");
-  for (const [from, downstreams] of system.connections) {
-    for (const to of downstreams) {
+  for (const [from, edges] of system.connections) {
+    for (const e of edges) {
       const fromLabel = system.dams.has(from) ? `${from} [DAM]` : from;
-      const toLabel = system.dams.has(to) ? `${to} [DAM]` : to;
+      const toLabel = system.dams.has(e.target) ? `${e.target} [DAM]` : e.target;
       o.println("  " + padRight(fromLabel, 22) + " →  " + toLabel);
     }
   }
@@ -72,7 +72,7 @@ function tracePath(
   if (node === finalOutlet) return;
   const downstream = system.connections.get(node);
   if (downstream && downstream.length > 0) {
-    tracePath(system, downstream[0]!, path, finalOutlet);
+    tracePath(system, downstream[0]!.target, path, finalOutlet);
   }
 }
 
@@ -230,6 +230,79 @@ export function printFlowTable(
   }
 
   o.println("");
+}
+
+export function printMarkovMap(o: Output, system: RiverSystem): void {
+  o.println("");
+  o.println("=== MARKOV CHAIN: " + system.name + " ===\n");
+
+  const states = [...system.rivers.keys(), ...system.dams.keys()];
+  o.println("States (" + states.length + "):");
+  o.println("  " + states.join(", "));
+  o.println("");
+
+  o.println("Transitions:");
+  for (const [src, outs] of system.connections) {
+    for (let i = 0; i < outs.length; i++) {
+      const e = outs[i]!;
+      const w = formatWeight(e.weight);
+      if (i === 0) {
+        o.println("  " + src + " ─[" + w + "]─▶ " + e.target);
+      } else {
+        const pad = " ".repeat(src.length + 2);
+        o.println(pad + "└[" + w + "]─▶ " + e.target);
+      }
+    }
+  }
+  o.println("");
+
+  o.println("Outgoing weights per state:");
+  for (const src of states) {
+    const outs = system.connections.get(src);
+    if (!outs || outs.length === 0) {
+      o.println("  " + src + " absorbing");
+      continue;
+    }
+    let sum = 0;
+    for (const e of outs) sum += e.weight;
+    const mark = Math.abs(sum - 1.0) < 1e-6 ? "  ✓" : "  ✗";
+    o.println("  " + src + " → " + sum.toFixed(3) + mark);
+  }
+  o.println("");
+}
+
+export function printMarkovDistribution(o: Output, system: RiverSystem): void {
+  const tickWord = system.markovTicksRun === 1 ? "tick" : "ticks";
+  const status = system.markovConverged ? ", converged" : ", not yet converged";
+  o.println("");
+  o.println(
+    "=== MARKOV DISTRIBUTION: " + system.name +
+    " (" + system.markovTicksRun + " " + tickWord + status + ") ===\n",
+  );
+
+  let locWidth = 5;
+  for (const s of system.markovHistory.keys()) {
+    if (s.length > locWidth) locWidth = s.length;
+  }
+
+  o.println("Final distribution:");
+  let total = 0;
+  for (const [state, hist] of system.markovHistory) {
+    const v = hist[system.markovTicksRun]!;
+    total += v;
+    o.println("  " + padRight(state, locWidth) + "  " + v.toFixed(4));
+  }
+  o.println("");
+  o.println("Total mass: " + total.toFixed(4));
+  o.println("");
+}
+
+function formatWeight(w: number): string {
+  if (w === Math.floor(w)) return w.toFixed(1);
+  let s = w.toFixed(3);
+  while (s.endsWith("0")) s = s.slice(0, -1);
+  if (s.endsWith(".")) s += "0";
+  return s;
 }
 
 // Render the cumulative outlet volume in the most appropriate unit
