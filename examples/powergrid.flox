@@ -18,10 +18,10 @@ Hub       -[3]-> SouthCity;
 NorthCity -[1]-> SouthCity;
 
 // Nodes. supply > 0 means generator, supply < 0 means load.
-river Plant     { base: 0, peak: 0, supply:  100 }
-river Hub       { base: 0, peak: 0 }
-river NorthCity { base: 0, peak: 0, supply:  -40 }
-river SouthCity { base: 0, peak: 0, supply:  -60 }
+node Plant     { supply:  100 }
+node Hub;
+node NorthCity { supply:  -40 }
+node SouthCity { supply:  -60 }
 
 map MiniGrid;
 print MiniGrid 500;

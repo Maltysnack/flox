@@ -1,1 +1,1 @@
-Runtime error: Node 'A' is declared more than once in system 'Bad'.
+Runtime error: Node 'A' (line 5) is declared more than once in system 'Bad'.

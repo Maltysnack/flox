@@ -11,6 +11,7 @@ const KEYWORDS: Record<string, TokenType> = {
   river: TokenType.RIVER,
   dam: TokenType.DAM,
   outlet: TokenType.OUTLET,
+  node: TokenType.NODE,
   mode: TokenType.MODE,
   start: TokenType.START,
 };

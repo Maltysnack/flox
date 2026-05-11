@@ -35,10 +35,7 @@ class Interpreter implements Ast.Visitor<Void> {
             resolveChains();
 
             // Per-mode validation pass.
-            for (RiverSystem s : systems.values()) {
-                if (s.mode == RiverSystem.Mode.MARKOV) validateMarkov(s);
-                if (s.mode == RiverSystem.Mode.GRID)   validateGrid(s);
-            }
+            for (RiverSystem s : systems.values()) s.mode.validate(s);
 
             // Phase 2: identify roots once per system, then execute actions.
             for (RiverSystem s : systems.values()) {
@@ -77,7 +74,7 @@ class Interpreter implements Ast.Visitor<Void> {
         if (currentSystem.rivers.containsKey(decl.name.lexeme)
                 || currentSystem.dams.containsKey(decl.name.lexeme)) {
             throw new RuntimeException(
-                    "Node '" + decl.name.lexeme + "' is declared more than once in system '"
+                    "Node '" + decl.name.lexeme + "' (line " + decl.name.line + ") is declared more than once in system '"
                             + currentSystem.name + "'.");
         }
         currentSystem.addRiver(new River(
@@ -92,11 +89,28 @@ class Interpreter implements Ast.Visitor<Void> {
         if (currentSystem.rivers.containsKey(decl.name.lexeme)
                 || currentSystem.dams.containsKey(decl.name.lexeme)) {
             throw new RuntimeException(
-                    "Node '" + decl.name.lexeme + "' is declared more than once in system '"
+                    "Node '" + decl.name.lexeme + "' (line " + decl.name.line + ") is declared more than once in system '"
                             + currentSystem.name + "'.");
         }
         currentSystem.addDam(new Dam(
                 decl.name.lexeme, decl.capacity, decl.threshold, decl.normalRate, decl.openRate));
+        return null;
+    }
+
+    @Override
+    public Void visitNodeDecl(Ast.NodeDecl decl) {
+        if (phase != Phase.COLLECT) return null;
+        requireSystem(decl.name);
+        if (currentSystem.rivers.containsKey(decl.name.lexeme)
+                || currentSystem.dams.containsKey(decl.name.lexeme)) {
+            throw new RuntimeException(
+                    "Node '" + decl.name.lexeme + "' (line " + decl.name.line + ") is declared more than once in system '"
+                            + currentSystem.name + "'.");
+        }
+        // A 'node' desugars to a zero-flow river carrying the given supply.
+        // Markov mode treats it as a plain state; grid mode reads supply;
+        // river mode treats it as an outlet-like passthrough.
+        currentSystem.addRiver(new River(decl.name.lexeme, 0, 0, 0.7, decl.supply));
         return null;
     }
 
@@ -107,7 +121,7 @@ class Interpreter implements Ast.Visitor<Void> {
         if (currentSystem.rivers.containsKey(decl.name.lexeme)
                 || currentSystem.dams.containsKey(decl.name.lexeme)) {
             throw new RuntimeException(
-                    "Node '" + decl.name.lexeme + "' is declared more than once in system '"
+                    "Node '" + decl.name.lexeme + "' (line " + decl.name.line + ") is declared more than once in system '"
                             + currentSystem.name + "'.");
         }
         // Outlets are stored as zero-flow rivers; the runtime detects them via
@@ -175,65 +189,9 @@ class Interpreter implements Ast.Visitor<Void> {
                     Token from = arrow.forward ? a : b;
                     Token to   = arrow.forward ? b : a;
                     double weight = arrow.weight != null ? arrow.weight : 1.0;
-                    system.addConnection(from.lexeme, to.lexeme, weight);
+                    system.addConnection(from.lexeme, to.lexeme, weight, arrow.op);
                 }
             }
-        }
-    }
-
-    // Markov-mode requirements:
-    //   * Every initial-mass entry refers to a declared node.
-    //   * For each node with outgoing edges, the weights sum to 1.0.
-    //   * At least one node has non-zero initial mass.
-    private void validateMarkov(RiverSystem system) {
-        for (String name : system.initialMass.keySet()) {
-            if (!nodeDefined(system, name)) {
-                throw new RuntimeException(
-                        "start references undeclared node '" + name
-                                + "' in system '" + system.name + "'.");
-            }
-        }
-        double totalInitial = 0;
-        for (double m : system.initialMass.values()) totalInitial += m;
-        if (totalInitial == 0) {
-            throw new RuntimeException(
-                    "Markov system '" + system.name
-                            + "' has no initial mass. Use 'start NodeName 1.0;' to set one.");
-        }
-
-        for (Map.Entry<String, List<RiverSystem.Edge>> entry : system.connections.entrySet()) {
-            String src = entry.getKey();
-            double sum = 0;
-            for (RiverSystem.Edge e : entry.getValue()) sum += e.weight;
-            if (Math.abs(sum - 1.0) > 1e-6) {
-                throw new RuntimeException(
-                        "Markov system '" + system.name + "': outgoing weights from '"
-                                + src + "' sum to " + sum + ", not 1.0.");
-            }
-        }
-    }
-
-    // Grid-mode requirements:
-    //   * Total supply across all nodes must sum to zero (otherwise the
-    //     simulation never reaches a steady state, levels diverge).
-    //   * At least one node has non-zero supply (otherwise nothing
-    //     happens, levels stay at zero forever).
-    private void validateGrid(RiverSystem system) {
-        double total = 0;
-        boolean hasSupply = false;
-        for (River r : system.rivers.values()) {
-            total += r.supply;
-            if (r.supply != 0) hasSupply = true;
-        }
-        if (!hasSupply) {
-            throw new RuntimeException(
-                    "Grid system '" + system.name + "' has no supply set on any node. "
-                            + "Use 'river X { base: 0, peak: 0, supply: N }' for generators (+) or loads (-).");
-        }
-        if (Math.abs(total) > 1e-6) {
-            throw new RuntimeException(
-                    "Grid system '" + system.name + "': supplies do not balance (sum = "
-                            + total + "). Generators (+) and loads (-) must sum to zero.");
         }
     }
 
@@ -252,11 +210,7 @@ class Interpreter implements Ast.Visitor<Void> {
     public Void visitMapStmt(Ast.MapStmt stmt) {
         if (phase != Phase.EXECUTE) return null;
         RiverSystem system = lookupSystem(stmt.systemName);
-        switch (system.mode) {
-            case MARKOV: OutputFormatter.printMarkovMap(system); break;
-            case GRID:   OutputFormatter.printGridMap(system);   break;
-            default:     OutputFormatter.printMap(system);       break;
-        }
+        system.mode.printMap(system);
         return null;
     }
 
@@ -272,30 +226,9 @@ class Interpreter implements Ast.Visitor<Void> {
     public Void visitPrintStmt(Ast.PrintStmt stmt) {
         if (phase != Phase.EXECUTE) return null;
         RiverSystem system = lookupSystem(stmt.systemName);
-        if (system.mode == RiverSystem.Mode.MARKOV) {
-            // The number after 'print' is the tick budget. Default 30.
-            int ticks = 30;
-            if (stmt.rainfall != null && stmt.rainfall.length > 0) {
-                ticks = (int) Math.round(stmt.rainfall[0]);
-                if (ticks < 1) ticks = 1;
-            }
-            system.simulateMarkov(ticks);
-            OutputFormatter.printMarkovDistribution(system);
-        } else if (system.mode == RiverSystem.Mode.GRID) {
-            // The number after 'print' is the tick budget. Default 500.
-            int ticks = 500;
-            if (stmt.rainfall != null && stmt.rainfall.length > 0) {
-                ticks = (int) Math.round(stmt.rainfall[0]);
-                if (ticks < 1) ticks = 1;
-            }
-            system.simulateGrid(ticks);
-            OutputFormatter.printGridState(system);
-        } else {
-            // Default rainfall: 1mm on day 1, dry thereafter.
-            double[] rainfall = (stmt.rainfall != null) ? stmt.rainfall : new double[] { 1.0 };
-            system.simulate(rainfall);
-            OutputFormatter.printFlowTable(system, rainfall);
-        }
+        double[] arg = (stmt.rainfall != null) ? stmt.rainfall : system.mode.defaultArg();
+        system.mode.run(system, arg);
+        system.mode.printResult(system, arg);
         return null;
     }
 

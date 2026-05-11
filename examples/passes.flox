@@ -31,10 +31,10 @@ Miss -[1.0]-> Miss;
 // Markov mode uses river/dam/outlet declarations as plain "state"
 // containers. The numeric attributes are unused in markov mode but
 // the declaration is still required so the resolver knows the name.
-river Pass  { base: 0, peak: 0 }
-river Shoot { base: 0, peak: 0 }
-river Goal  { base: 0, peak: 0 }
-river Miss  { base: 0, peak: 0 }
+node Pass;
+node Shoot;
+node Goal;
+node Miss;
 
 start Pass 1.0;
 

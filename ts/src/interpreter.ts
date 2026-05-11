@@ -1,18 +1,9 @@
 // Two-pass interpreter. Mechanical port of Interpreter.java.
 
 import { AstNode, Chain } from "./ast.ts";
-import {
-  Output,
-  printFlowTable,
-  printGridMap,
-  printGridState,
-  printHelp,
-  printList,
-  printMap,
-  printMarkovDistribution,
-  printMarkovMap,
-} from "./output.ts";
-import { Dam, Edge, Mode, River, RiverSystem } from "./runtime.ts";
+import { STRATEGIES } from "./modes.ts";
+import { Output, printHelp, printList } from "./output.ts";
+import { Dam, Mode, River, RiverSystem } from "./runtime.ts";
 import { Token } from "./token.ts";
 
 enum Phase {
@@ -46,10 +37,7 @@ export class Interpreter {
       this.resolveChains();
 
       // Per-mode validation pass.
-      for (const s of this.systems.values()) {
-        if (s.mode === "markov") this.validateMarkov(s);
-        if (s.mode === "grid")   this.validateGrid(s);
-      }
+      for (const s of this.systems.values()) STRATEGIES[s.mode].validate(s);
 
       for (const s of this.systems.values()) s.identifyRoots();
 
@@ -101,7 +89,7 @@ export class Interpreter {
         const sys = this.requireSystem(stmt.name);
         if (sys.rivers.has(stmt.name.lexeme) || sys.dams.has(stmt.name.lexeme)) {
           throw new Error(
-            `Node '${stmt.name.lexeme}' is declared more than once in system '${sys.name}'.`,
+            `Node '${stmt.name.lexeme}' (line ${stmt.name.line}) is declared more than once in system '${sys.name}'.`,
           );
         }
         sys.addRiver(
@@ -121,7 +109,7 @@ export class Interpreter {
         const sys = this.requireSystem(stmt.name);
         if (sys.rivers.has(stmt.name.lexeme) || sys.dams.has(stmt.name.lexeme)) {
           throw new Error(
-            `Node '${stmt.name.lexeme}' is declared more than once in system '${sys.name}'.`,
+            `Node '${stmt.name.lexeme}' (line ${stmt.name.line}) is declared more than once in system '${sys.name}'.`,
           );
         }
         sys.addDam(
@@ -136,12 +124,24 @@ export class Interpreter {
         return;
       }
 
+      case "NodeDecl": {
+        if (this.phase !== Phase.COLLECT) return;
+        const sys = this.requireSystem(stmt.name);
+        if (sys.rivers.has(stmt.name.lexeme) || sys.dams.has(stmt.name.lexeme)) {
+          throw new Error(
+            `Node '${stmt.name.lexeme}' (line ${stmt.name.line}) is declared more than once in system '${sys.name}'.`,
+          );
+        }
+        sys.addRiver(new River(stmt.name.lexeme, 0, 0, 0.7, stmt.supply));
+        return;
+      }
+
       case "OutletDecl": {
         if (this.phase !== Phase.COLLECT) return;
         const sys = this.requireSystem(stmt.name);
         if (sys.rivers.has(stmt.name.lexeme) || sys.dams.has(stmt.name.lexeme)) {
           throw new Error(
-            `Node '${stmt.name.lexeme}' is declared more than once in system '${sys.name}'.`,
+            `Node '${stmt.name.lexeme}' (line ${stmt.name.line}) is declared more than once in system '${sys.name}'.`,
           );
         }
         sys.addRiver(new River(stmt.name.lexeme, 0, 0, 0.7));
@@ -170,13 +170,7 @@ export class Interpreter {
       case "MapStmt": {
         if (this.phase !== Phase.EXECUTE) return;
         const sys = this.lookupSystem(stmt.systemName);
-        if (sys.mode === "markov") {
-          printMarkovMap(new Output(this.out), sys);
-        } else if (sys.mode === "grid") {
-          printGridMap(new Output(this.out), sys);
-        } else {
-          printMap(new Output(this.out), sys);
-        }
+        STRATEGIES[sys.mode].printMap(new Output(this.out), sys);
         return;
       }
 
@@ -190,25 +184,11 @@ export class Interpreter {
       case "PrintStmt": {
         if (this.phase !== Phase.EXECUTE) return;
         const sys = this.lookupSystem(stmt.systemName);
-        if (sys.mode === "markov") {
-          let ticks = 30;
-          if (stmt.rainfall != null && stmt.rainfall.length > 0) {
-            ticks = Math.max(1, Math.round(stmt.rainfall[0]!));
-          }
-          sys.simulateMarkov(ticks);
-          printMarkovDistribution(new Output(this.out), sys);
-        } else if (sys.mode === "grid") {
-          let ticks = 500;
-          if (stmt.rainfall != null && stmt.rainfall.length > 0) {
-            ticks = Math.max(1, Math.round(stmt.rainfall[0]!));
-          }
-          sys.simulateGrid(ticks);
-          printGridState(new Output(this.out), sys);
-        } else {
-          const rainfall = stmt.rainfall ?? [1.0];
-          sys.simulate(rainfall);
-          printFlowTable(new Output(this.out), sys, rainfall);
-        }
+        const strat = STRATEGIES[sys.mode];
+        const arg = stmt.rainfall ?? strat.defaultArg();
+        strat.run(sys, arg);
+        const o = new Output(this.out);
+        strat.printResult(o, sys, arg);
         return;
       }
 
@@ -238,56 +218,9 @@ export class Interpreter {
           const from = arrow.forward ? a : b;
           const to = arrow.forward ? b : a;
           const weight = arrow.weight != null ? arrow.weight : 1.0;
-          system.addConnection(from.lexeme, to.lexeme, weight);
+          system.addConnection(from.lexeme, to.lexeme, weight, arrow.op);
         }
       }
-    }
-  }
-
-  private validateMarkov(system: RiverSystem): void {
-    for (const name of system.initialMass.keys()) {
-      if (!this.nodeDefined(system, name)) {
-        throw new Error(
-          `start references undeclared node '${name}' in system '${system.name}'.`,
-        );
-      }
-    }
-    let totalInitial = 0;
-    for (const m of system.initialMass.values()) totalInitial += m;
-    if (totalInitial === 0) {
-      throw new Error(
-        `Markov system '${system.name}' has no initial mass. Use 'start NodeName 1.0;' to set one.`,
-      );
-    }
-    for (const [src, edges] of system.connections) {
-      let sum = 0;
-      for (const e of edges) sum += e.weight;
-      if (Math.abs(sum - 1.0) > 1e-6) {
-        throw new Error(
-          `Markov system '${system.name}': outgoing weights from '${src}' sum to ${sum}, not 1.0.`,
-        );
-      }
-    }
-  }
-
-  private validateGrid(system: RiverSystem): void {
-    let total = 0;
-    let hasSupply = false;
-    for (const r of system.rivers.values()) {
-      total += r.supply;
-      if (r.supply !== 0) hasSupply = true;
-    }
-    if (!hasSupply) {
-      throw new Error(
-        `Grid system '${system.name}' has no supply set on any node. ` +
-        `Use 'river X { base: 0, peak: 0, supply: N }' for generators (+) or loads (-).`,
-      );
-    }
-    if (Math.abs(total) > 1e-6) {
-      throw new Error(
-        `Grid system '${system.name}': supplies do not balance (sum = ${total}). ` +
-        `Generators (+) and loads (-) must sum to zero.`,
-      );
     }
   }
 

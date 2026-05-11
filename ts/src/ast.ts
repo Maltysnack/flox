@@ -11,6 +11,7 @@ export type AstNode =
   | RiverDecl
   | DamDecl
   | OutletDecl
+  | NodeDecl
   | Chain
   | StartStmt
   | MapStmt
@@ -44,6 +45,12 @@ export interface DamDecl {
 export interface OutletDecl {
   readonly kind: "OutletDecl";
   readonly name: Token;
+}
+
+export interface NodeDecl {
+  readonly kind: "NodeDecl";
+  readonly name: Token;
+  readonly supply: number;
 }
 
 export interface ChainEdge {

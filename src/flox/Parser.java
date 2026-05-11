@@ -34,6 +34,7 @@ class Parser {
             if (match(RIVER))    return riverDeclaration();
             if (match(DAM))      return damDeclaration();
             if (match(OUTLET))   return outletDeclaration();
+            if (match(NODE))     return nodeDeclaration();
             if (match(START))    return startStatement();
             if (match(MAP))      return mapStatement();
             if (match(LIST))     return listStatement();
@@ -145,6 +146,26 @@ class Parser {
         double normalRate = attrs.get("normalRate");
         double openRate   = attrs.get("openRate");
         return new Ast.Dam(name, capacity, threshold, normalRate, openRate);
+    }
+
+    // node Name;             (no attributes)
+    // node Name { supply: -40 }   (markov / grid; supply optional)
+    private Ast nodeDeclaration() {
+        Token name = consume(IDENTIFIER, "Expect node name.");
+        Map<String, Double> attrs;
+        if (check(LEFT_BRACE)) {
+            attrs = parseBlock(name);
+        } else {
+            attrs = new HashMap<>();
+        }
+        consumeOptional(SEMICOLON);
+
+        validateAttrs(name, attrs,
+                new String[] {},
+                new String[] { "supply" });
+
+        double supply = attrs.getOrDefault("supply", 0.0);
+        return new Ast.NodeDecl(name, supply);
     }
 
     // outlet lowerMongolo;   or   outlet lowerMongolo {}
@@ -328,6 +349,7 @@ class Parser {
                 case RIVER:
                 case DAM:
                 case OUTLET:
+                case NODE:
                 case START:
                 case MAP:
                 case LIST:

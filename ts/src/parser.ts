@@ -9,6 +9,7 @@ import {
   ListStmt,
   MapStmt,
   ModeDecl,
+  NodeDecl,
   OutletDecl,
   PrintStmt,
   RiverDecl,
@@ -43,6 +44,7 @@ export class Parser {
       if (this.match(TokenType.RIVER))  return this.riverDeclaration();
       if (this.match(TokenType.DAM))    return this.damDeclaration();
       if (this.match(TokenType.OUTLET)) return this.outletDeclaration();
+      if (this.match(TokenType.NODE))   return this.nodeDeclaration();
       if (this.match(TokenType.START))  return this.startStatement();
       if (this.match(TokenType.MAP))    return this.mapStatement();
       if (this.match(TokenType.LIST))   return this.listStatement();
@@ -152,6 +154,17 @@ export class Parser {
       normalRate: attrs.get("normalRate")!,
       openRate: attrs.get("openRate")!,
     };
+  }
+
+  private nodeDeclaration(): NodeDecl {
+    const name = this.consume(TokenType.IDENTIFIER, "Expect node name.");
+    const attrs = this.check(TokenType.LEFT_BRACE)
+      ? this.parseBlock(name)
+      : new Map<string, number>();
+    this.consumeOptional(TokenType.SEMICOLON);
+    this.validateAttrs(name, attrs, [], ["supply"]);
+    const supply = attrs.get("supply") ?? 0;
+    return { kind: "NodeDecl", name, supply };
   }
 
   private outletDeclaration(): OutletDecl {
@@ -341,6 +354,7 @@ export class Parser {
         case TokenType.RIVER:
         case TokenType.DAM:
         case TokenType.OUTLET:
+        case TokenType.NODE:
         case TokenType.START:
         case TokenType.MAP:
         case TokenType.LIST:

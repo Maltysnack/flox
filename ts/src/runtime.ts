@@ -1,6 +1,8 @@
 // Runtime domain types: River, Dam, RiverSystem.
 // Mechanical port of River.java, Dam.java, RiverSystem.java.
 
+import { Token } from "./token.ts";
+
 export class River {
   dailyFlow: number[] = new Array(10).fill(0);
   totalAccumulated = 0;
@@ -86,6 +88,7 @@ export type Mode = "river" | "markov" | "grid";
 export interface Edge {
   target: string;
   weight: number;
+  op: Token | null; // arrow token that declared this edge, for diagnostics
 }
 
 export class RiverSystem {
@@ -117,13 +120,13 @@ export class RiverSystem {
     this.dams.set(dam.name, dam);
   }
 
-  addConnection(from: string, to: string, weight: number): void {
+  addConnection(from: string, to: string, weight: number, op: Token | null): void {
     let downstream = this.connections.get(from);
     if (!downstream) {
       downstream = [];
       this.connections.set(from, downstream);
     }
-    downstream.push({ target: to, weight });
+    downstream.push({ target: to, weight, op });
   }
 
   identifyRoots(): void {

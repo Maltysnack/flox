@@ -21,9 +21,9 @@ Rainy  -[0.30]-> Sunny;
 Rainy  -[0.30]-> Cloudy;
 Rainy  -[0.40]-> Rainy;
 
-river Sunny  { base: 0, peak: 0 }
-river Cloudy { base: 0, peak: 0 }
-river Rainy  { base: 0, peak: 0 }
+node Sunny;
+node Cloudy;
+node Rainy;
 
 start Sunny 1.0;
 

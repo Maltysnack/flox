@@ -15,6 +15,8 @@ abstract class Ast {
 
         R visitOutletDecl(Outlet decl);
 
+        R visitNodeDecl(NodeDecl decl);
+
         R visitChain(Chain chain);
 
         R visitStartStmt(StartStmt stmt);
@@ -86,6 +88,24 @@ abstract class Ast {
         @Override
         public <R> R accept(Visitor<R> visitor) {
             return visitor.visitDamDecl(this);
+        }
+    }
+
+    // node Name;   or   node Name { supply: -40 }
+    // A generic state container. Mode-agnostic; meaningful attributes
+    // depend on the system's mode (currently only 'supply' for grid mode).
+    public static class NodeDecl extends Ast {
+        public final Token name;
+        public final double supply;
+
+        public NodeDecl(Token name, double supply) {
+            this.name = name;
+            this.supply = supply;
+        }
+
+        @Override
+        public <R> R accept(Visitor<R> visitor) {
+            return visitor.visitNodeDecl(this);
         }
     }
 

@@ -3,15 +3,127 @@ package flox;
 import java.util.*;
 
 class RiverSystem {
-    enum Mode { RIVER, MARKOV, GRID }
+    // Each mode is its own strategy: validate the system before
+    // simulation, run a tick budget against it, render the topology
+    // (map), render the result of a simulation (print).
+    enum Mode {
+        RIVER {
+            void validate(RiverSystem s) { /* no-op */ }
+
+            void run(RiverSystem s, double[] arg) { s.simulate(arg); }
+
+            double[] defaultArg() { return new double[] { 1.0 }; }
+
+            void printMap(RiverSystem s) { OutputFormatter.printMap(s); }
+
+            void printResult(RiverSystem s, double[] arg) {
+                OutputFormatter.printFlowTable(s, arg);
+            }
+        },
+
+        MARKOV {
+            void validate(RiverSystem s) {
+                for (String name : s.initialMass.keySet()) {
+                    if (!s.rivers.containsKey(name) && !s.dams.containsKey(name)) {
+                        throw new RuntimeException(
+                                "start references undeclared node '" + name
+                                        + "' in system '" + s.name + "'.");
+                    }
+                }
+                double totalInitial = 0;
+                for (double m : s.initialMass.values()) totalInitial += m;
+                if (totalInitial == 0) {
+                    throw new RuntimeException(
+                            "Markov system '" + s.name
+                                    + "' has no initial mass. Use 'start NodeName 1.0;' to set one.");
+                }
+                for (Map.Entry<String, List<Edge>> entry : s.connections.entrySet()) {
+                    double sum = 0;
+                    StringBuilder lines = new StringBuilder();
+                    for (Edge e : entry.getValue()) {
+                        sum += e.weight;
+                        if (e.op != null) {
+                            if (lines.length() > 0) lines.append(", ");
+                            lines.append("line ").append(e.op.line);
+                        }
+                    }
+                    if (Math.abs(sum - 1.0) > 1e-6) {
+                        String where = lines.length() > 0 ? " (" + lines + ")" : "";
+                        throw new RuntimeException(
+                                "Markov system '" + s.name + "': outgoing weights from '"
+                                        + entry.getKey() + "'" + where + " sum to " + sum + ", not 1.0.");
+                    }
+                }
+            }
+
+            void run(RiverSystem s, double[] arg) {
+                int ticks = (arg.length > 0)
+                        ? Math.max(1, (int) Math.round(arg[0]))
+                        : 30;
+                s.simulateMarkov(ticks);
+            }
+
+            double[] defaultArg() { return new double[] { 30 }; }
+
+            void printMap(RiverSystem s) { OutputFormatter.printMarkovMap(s); }
+
+            void printResult(RiverSystem s, double[] arg) {
+                OutputFormatter.printMarkovDistribution(s);
+            }
+        },
+
+        GRID {
+            void validate(RiverSystem s) {
+                double total = 0;
+                boolean hasSupply = false;
+                for (River r : s.rivers.values()) {
+                    total += r.supply;
+                    if (r.supply != 0) hasSupply = true;
+                }
+                if (!hasSupply) {
+                    throw new RuntimeException(
+                            "Grid system '" + s.name + "' has no supply set on any node. "
+                                    + "Use 'node X { supply: N }' for generators (+) or loads (-).");
+                }
+                if (Math.abs(total) > 1e-6) {
+                    throw new RuntimeException(
+                            "Grid system '" + s.name + "': supplies do not balance (sum = "
+                                    + total + "). Generators (+) and loads (-) must sum to zero.");
+                }
+            }
+
+            void run(RiverSystem s, double[] arg) {
+                int ticks = (arg.length > 0)
+                        ? Math.max(1, (int) Math.round(arg[0]))
+                        : 500;
+                s.simulateGrid(ticks);
+            }
+
+            double[] defaultArg() { return new double[] { 500 }; }
+
+            void printMap(RiverSystem s) { OutputFormatter.printGridMap(s); }
+
+            void printResult(RiverSystem s, double[] arg) {
+                OutputFormatter.printGridState(s);
+            }
+        };
+
+        abstract void validate(RiverSystem s);
+        abstract void run(RiverSystem s, double[] arg);
+        abstract double[] defaultArg();
+        abstract void printMap(RiverSystem s);
+        abstract void printResult(RiverSystem s, double[] arg);
+    }
 
     static class Edge {
         final String target;
         final double weight;
+        final Token op; // arrow token that declared this edge (for diagnostics)
 
-        Edge(String target, double weight) {
+        Edge(String target, double weight, Token op) {
             this.target = target;
             this.weight = weight;
+            this.op = op;
         }
     }
 
@@ -46,8 +158,8 @@ class RiverSystem {
         dams.put(dam.name, dam);
     }
 
-    void addConnection(String from, String to, double weight) {
-        connections.computeIfAbsent(from, k -> new ArrayList<>()).add(new Edge(to, weight));
+    void addConnection(String from, String to, double weight, Token op) {
+        connections.computeIfAbsent(from, k -> new ArrayList<>()).add(new Edge(to, weight, op));
     }
 
     void identifyRoots() {

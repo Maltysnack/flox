@@ -18,6 +18,7 @@ class Scanner {
         keywords.put("river", TokenType.RIVER);
         keywords.put("dam", TokenType.DAM);
         keywords.put("outlet", TokenType.OUTLET);
+        keywords.put("node", TokenType.NODE);
         keywords.put("mode", TokenType.MODE);
         keywords.put("start", TokenType.START);
     }

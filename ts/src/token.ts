@@ -29,6 +29,7 @@ export enum TokenType {
   RIVER = "RIVER",
   DAM = "DAM",
   OUTLET = "OUTLET",
+  NODE = "NODE",
   MODE = "MODE",
   START = "START",
 
