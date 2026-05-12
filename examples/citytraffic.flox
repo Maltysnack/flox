@@ -1,0 +1,32 @@
+// MorningCommute: cars during morning rush hour. Two suburban areas
+// supply commuters, two destinations (Office, Industrial) draw them.
+// Two highways carry traffic into Downtown which redistributes. A
+// shortcut from EastHwy direct to Office lets eastern traffic bypass
+// downtown.
+//
+// Grid mode treats road capacities as conductances; higher numbers mean
+// more throughput. Levels are stylised "congestion potentials": cars
+// flow from high-congestion areas to low-congestion ones in proportion
+// to road throughput. Supplies must sum to zero (everyone arrives
+// somewhere).
+mode grid;
+system MorningCommute;
+
+EastSub  -[20]-> EastHwy;
+WestSub  -[20]-> WestHwy;
+EastHwy  -[30]-> Downtown;
+WestHwy  -[30]-> Downtown;
+Downtown -[15]-> Office;
+Downtown -[15]-> Industrial;
+EastHwy  -[10]-> Office;
+
+node EastSub    { supply:  40 }
+node WestSub    { supply:  50 }
+node EastHwy;
+node WestHwy;
+node Downtown;
+node Office     { supply: -45 }
+node Industrial { supply: -45 }
+
+map MorningCommute;
+print MorningCommute 500;

@@ -245,7 +245,6 @@ export class RiverSystem {
   // (supply + net_inflow) over time with a damping factor dt.
   simulateGrid(maxTicks: number): void {
     const EPSILON = 1e-7;
-    const DT = 0.1;
 
     const nodes: string[] = [...this.rivers.keys(), ...this.dams.keys()];
 
@@ -260,6 +259,20 @@ export class RiverSystem {
         if (!edgeEnds.has(key)) edgeEnds.set(key, [from, e.target]);
       }
     }
+
+    // Adaptive damping. Jacobi iteration is stable when dt < 2 / max
+    // Laplacian eigenvalue; that eigenvalue is bounded by 2 * max
+    // row-sum (sum of conductances incident on any node). So
+    // dt = 0.5 / maxNodeSum is safely stable.
+    const nodeSum = new Map<string, number>();
+    for (const [key, ends] of edgeEnds) {
+      const c = edgeC.get(key)!;
+      nodeSum.set(ends[0], (nodeSum.get(ends[0]) ?? 0) + c);
+      nodeSum.set(ends[1], (nodeSum.get(ends[1]) ?? 0) + c);
+    }
+    let maxNodeSum = 0;
+    for (const v of nodeSum.values()) maxNodeSum = Math.max(maxNodeSum, v);
+    const DT = maxNodeSum > 0 ? Math.min(0.1, 0.5 / maxNodeSum) : 0.1;
 
     this.gridLevel.clear();
     for (const n of nodes) this.gridLevel.set(n, 0);

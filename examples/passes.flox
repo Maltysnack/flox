@@ -24,13 +24,8 @@ Pass  -[0.15]-> Shoot;   // 15% become shots
 Shoot -[0.10]-> Goal;    // ~10% shot conversion (league average)
 Shoot -[0.90]-> Miss;
 
-// Absorbing: mass that arrives stays.
-Goal -[1.0]-> Goal;
-Miss -[1.0]-> Miss;
-
-// Markov mode uses river/dam/outlet declarations as plain "state"
-// containers. The numeric attributes are unused in markov mode but
-// the declaration is still required so the resolver knows the name.
+// Goal and Miss have no outgoing edges. Markov mode treats nodes with
+// no outgoing edges as absorbing automatically (mass that arrives stays).
 node Pass;
 node Shoot;
 node Goal;

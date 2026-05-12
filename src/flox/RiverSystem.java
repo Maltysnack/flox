@@ -358,7 +358,6 @@ class RiverSystem {
     // dt = 0.1 keeps iteration stable for moderately-conditioned graphs.
     void simulateGrid(int maxTicks) {
         final double EPSILON = 1e-7;
-        final double DT = 0.1;
 
         final List<String> nodes = new ArrayList<>(rivers.keySet());
         nodes.addAll(dams.keySet());
@@ -378,6 +377,24 @@ class RiverSystem {
                 edgeEnds.putIfAbsent(key, new String[] { a, b });
             }
         }
+
+        // Adaptive damping. The Jacobi iteration is stable when
+        //   dt < 2 / lambda_max(L)
+        // where lambda_max of the graph Laplacian is at most twice the
+        // maximum row-sum (sum of conductances incident on any node).
+        // So dt = 0.5 / maxNodeSum is safely under the stability limit.
+        // For small conductances we cap dt at 0.1 to avoid being slower
+        // than necessary.
+        Map<String, Double> nodeSum = new HashMap<>();
+        for (Map.Entry<String, String[]> entry : edgeEnds.entrySet()) {
+            String[] ends = entry.getValue();
+            double c = edgeC.get(entry.getKey());
+            nodeSum.merge(ends[0], c, Double::sum);
+            nodeSum.merge(ends[1], c, Double::sum);
+        }
+        double maxNodeSum = 0;
+        for (double v : nodeSum.values()) maxNodeSum = Math.max(maxNodeSum, v);
+        final double DT = (maxNodeSum > 0) ? Math.min(0.1, 0.5 / maxNodeSum) : 0.1;
 
         gridLevel.clear();
         for (String n : nodes) gridLevel.put(n, 0.0);

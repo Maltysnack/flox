@@ -9,14 +9,12 @@ Transitions:
       └[0.15]─▶ Shoot
   Shoot ─[0.1]─▶ Goal
        └[0.9]─▶ Miss
-  Goal ─[1.0]─▶ Goal
-  Miss ─[1.0]─▶ Miss
 
 Outgoing weights per state:
   Pass → 1.000  ✓
   Shoot → 1.000  ✓
-  Goal → 1.000  ✓
-  Miss → 1.000  ✓
+  Goal absorbing
+  Miss absorbing
 
 
 === MARKOV DISTRIBUTION: PassOrShoot (118 ticks, converged) ===
