@@ -14,7 +14,7 @@ enum TokenType {
     // Keywords.
     SYSTEM, MAP, LIST, PRINT, HELP,
     RIVER, DAM, OUTLET, NODE,
-    MODE, START,
+    MODE, START, DISABLE,
 
     EOF
 }

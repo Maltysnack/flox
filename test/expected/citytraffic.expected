@@ -14,7 +14,7 @@ Edges (7):
   EastSub    <-> EastHwy      c=20.0
   WestSub    <-> WestHwy      c=20.0
   EastHwy    <-> Downtown     c=30.0
-  EastHwy    <-> Office       c=10.0
+  EastHwy    <-> Office       c=10.0   (disabled)
   WestHwy    <-> Downtown     c=30.0
   Downtown   <-> Office       c=15.0
   Downtown   <-> Industrial   c=15.0
@@ -22,23 +22,22 @@ Edges (7):
 Net supply: 0.0 ✓ (balanced)
 
 
-=== GRID STATE: MorningCommute (237 ticks, converged) ===
+=== GRID STATE: MorningCommute (222 ticks, converged) ===
 
 Levels:
-  EastSub     +1.97
+  EastSub     +2.69
   WestSub     +3.52
-  EastHwy     -0.03
+  EastHwy     +0.69
   WestHwy     +1.02
   Downtown    -0.64
-  Office      -2.20
+  Office      -3.64
   Industrial  -3.64
 
 Flows (positive = first-to-second direction):
   EastSub    -> EastHwy     +40.00
   WestSub    -> WestHwy     +50.00
-  EastHwy    -> Downtown    +18.33
-  EastHwy    -> Office      +21.67
+  EastHwy    -> Downtown    +40.00
   WestHwy    -> Downtown    +50.00
-  Downtown   -> Office      +23.33
+  Downtown   -> Office      +45.00
   Downtown   -> Industrial  +45.00
 

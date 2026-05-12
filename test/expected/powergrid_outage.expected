@@ -1,0 +1,35 @@
+
+=== GRID: Outage ===
+
+Nodes (5):
+  Plant      generator  +100.00  (disabled)
+  Backup     generator  +30.00
+  Hub        relay
+  NorthCity  load       -65.00
+  SouthCity  load       -65.00
+
+Edges (5):
+  Plant     <-> Hub         c=5.0   (disabled)
+  Backup    <-> Hub         c=2.0
+  Hub       <-> NorthCity   c=3.0
+  Hub       <-> SouthCity   c=3.0
+  NorthCity <-> SouthCity   c=1.0
+
+Net supply: -100.0 ✗ (unbalanced)
+
+
+=== GRID STATE: Outage (500 ticks, not yet converged) ===
+
+Levels:
+  Backup     -753.96
+  Hub        -781.46
+  NorthCity  -794.79
+  SouthCity  -794.79
+
+Flows (positive = first-to-second direction):
+  Backup    -> Hub        +55.00
+  Hub       -> NorthCity  +40.00
+  Hub       -> SouthCity  +40.00
+  NorthCity -> SouthCity   0.00
+
+Note (scenario): Grid system 'Outage': supplies do not balance (sum = -100.0 after disabling). Generators (+) and loads (-) must sum to zero.

@@ -8,7 +8,7 @@ class RiverSystem {
     // (map), render the result of a simulation (print).
     enum Mode {
         RIVER {
-            void validate(RiverSystem s) { /* no-op */ }
+            void validate(RiverSystem s, List<String> errs) { /* no-op */ }
 
             void run(RiverSystem s, double[] arg) { s.simulate(arg); }
 
@@ -22,7 +22,7 @@ class RiverSystem {
         },
 
         MARKOV {
-            void validate(RiverSystem s) {
+            void validate(RiverSystem s, List<String> errs) {
                 for (String name : s.initialMass.keySet()) {
                     if (!s.rivers.containsKey(name) && !s.dams.containsKey(name)) {
                         throw new RuntimeException(
@@ -31,27 +31,45 @@ class RiverSystem {
                     }
                 }
                 double totalInitial = 0;
-                for (double m : s.initialMass.values()) totalInitial += m;
+                for (Map.Entry<String, Double> entry : s.initialMass.entrySet()) {
+                    if (s.disabledNodes.contains(entry.getKey())) continue;
+                    totalInitial += entry.getValue();
+                }
                 if (totalInitial == 0) {
                     throw new RuntimeException(
                             "Markov system '" + s.name
-                                    + "' has no initial mass. Use 'start NodeName 1.0;' to set one.");
+                                    + "' has no initial mass on any active node. Use 'start NodeName 1.0;' to set one.");
                 }
+                // Per-source sum-to-1, considering only enabled edges and
+                // skipping disabled source nodes entirely. If any element
+                // is disabled we soften this to a warning (the user is
+                // exploring a scenario; an unbalanced chain is OK).
+                boolean softened = !s.disabledNodes.isEmpty()
+                        || s.connections.values().stream().flatMap(List::stream).anyMatch(e -> !e.enabled);
                 for (Map.Entry<String, List<Edge>> entry : s.connections.entrySet()) {
+                    if (s.disabledNodes.contains(entry.getKey())) continue;
                     double sum = 0;
+                    boolean anyEnabled = false;
                     StringBuilder lines = new StringBuilder();
                     for (Edge e : entry.getValue()) {
+                        if (!e.enabled) continue;
+                        anyEnabled = true;
                         sum += e.weight;
                         if (e.op != null) {
                             if (lines.length() > 0) lines.append(", ");
                             lines.append("line ").append(e.op.line);
                         }
                     }
+                    if (!anyEnabled) continue;  // becomes absorbing after disabling
                     if (Math.abs(sum - 1.0) > 1e-6) {
                         String where = lines.length() > 0 ? " (" + lines + ")" : "";
-                        throw new RuntimeException(
-                                "Markov system '" + s.name + "': outgoing weights from '"
-                                        + entry.getKey() + "'" + where + " sum to " + sum + ", not 1.0.");
+                        String msg = "Markov system '" + s.name + "': outgoing weights from '"
+                                + entry.getKey() + "'" + where + " sum to " + sum + ", not 1.0.";
+                        if (softened) {
+                            errs.add("Note (scenario): " + msg + "\n");
+                        } else {
+                            throw new RuntimeException(msg);
+                        }
                     }
                 }
             }
@@ -73,22 +91,29 @@ class RiverSystem {
         },
 
         GRID {
-            void validate(RiverSystem s) {
+            void validate(RiverSystem s, List<String> errs) {
                 double total = 0;
                 boolean hasSupply = false;
                 for (River r : s.rivers.values()) {
+                    if (s.disabledNodes.contains(r.name)) continue;
                     total += r.supply;
                     if (r.supply != 0) hasSupply = true;
                 }
                 if (!hasSupply) {
                     throw new RuntimeException(
-                            "Grid system '" + s.name + "' has no supply set on any node. "
+                            "Grid system '" + s.name + "' has no supply set on any active node. "
                                     + "Use 'node X { supply: N }' for generators (+) or loads (-).");
                 }
+                boolean softened = !s.disabledNodes.isEmpty()
+                        || s.connections.values().stream().flatMap(List::stream).anyMatch(e -> !e.enabled);
                 if (Math.abs(total) > 1e-6) {
-                    throw new RuntimeException(
-                            "Grid system '" + s.name + "': supplies do not balance (sum = "
-                                    + total + "). Generators (+) and loads (-) must sum to zero.");
+                    String msg = "Grid system '" + s.name + "': supplies do not balance (sum = "
+                            + total + " after disabling). Generators (+) and loads (-) must sum to zero.";
+                    if (softened) {
+                        errs.add("Note (scenario): " + msg + "\n");
+                    } else {
+                        throw new RuntimeException(msg);
+                    }
                 }
             }
 
@@ -108,7 +133,7 @@ class RiverSystem {
             }
         };
 
-        abstract void validate(RiverSystem s);
+        abstract void validate(RiverSystem s, List<String> errs);
         abstract void run(RiverSystem s, double[] arg);
         abstract double[] defaultArg();
         abstract void printMap(RiverSystem s);
@@ -119,6 +144,7 @@ class RiverSystem {
         final String target;
         final double weight;
         final Token op; // arrow token that declared this edge (for diagnostics)
+        boolean enabled = true;
 
         Edge(String target, double weight, Token op) {
             this.target = target;
@@ -133,6 +159,12 @@ class RiverSystem {
     Map<String, Dam> dams = new LinkedHashMap<>();
     Map<String, List<Edge>> connections = new LinkedHashMap<>(); // name -> outgoing edges, insertion-ordered
     List<String> roots = new ArrayList<>(); // Rivers with no upstream
+
+    // Scenario-disabling. Nodes whose names appear here are skipped by
+    // every simulator (their incident edges effectively don't exist),
+    // but they remain in rivers/dams so the visualisation can render
+    // them dimmed.
+    Set<String> disabledNodes = new LinkedHashSet<>();
 
     // Markov-mode state.
     Map<String, Double> initialMass = new LinkedHashMap<>();
@@ -166,12 +198,13 @@ class RiverSystem {
         roots.clear();
         Set<String> hasUpstream = new HashSet<>();
         for (List<Edge> downstream : connections.values()) {
-            for (Edge e : downstream) hasUpstream.add(e.target);
+            for (Edge e : downstream) {
+                if (!e.enabled) continue;
+                hasUpstream.add(e.target);
+            }
         }
-        // Iterate rivers in declaration (insertion) order. Dams and outlets
-        // are excluded as roots: dams always have an upstream, outlets are
-        // terminators.
         for (River r : rivers.values()) {
+            if (disabledNodes.contains(r.name)) continue;
             if (!hasUpstream.contains(r.name) && !r.isTerminator()) {
                 roots.add(r.name);
             }
@@ -209,11 +242,13 @@ class RiverSystem {
 
             // Calculate flow for each node
             for (String node : getTopologicalOrder()) {
+                if (disabledNodes.contains(node)) continue;
                 double flow = 0;
 
                 // Get inflow from upstream, weighted per-edge.
                 for (Map.Entry<String, List<Edge>> entry : connections.entrySet()) {
                     for (Edge e : entry.getValue()) {
+                        if (!e.enabled) continue;
                         if (e.target.equals(node)) {
                             flow += flowThisDay.getOrDefault(entry.getKey(), 0.0) * e.weight;
                         }
@@ -260,6 +295,7 @@ class RiverSystem {
 
         for (List<Edge> downstream : connections.values()) {
             for (Edge e : downstream) {
+                if (!e.enabled) continue;
                 inDegree.put(e.target, inDegree.getOrDefault(e.target, 0) + 1);
             }
         }
@@ -280,6 +316,7 @@ class RiverSystem {
             List<Edge> downstream = connections.get(node);
             if (downstream != null) {
                 for (Edge e : downstream) {
+                    if (!e.enabled) continue;
                     String next = e.target;
                     int newDegree = inDegree.get(next) - 1;
                     inDegree.put(next, newDegree);
@@ -299,8 +336,9 @@ class RiverSystem {
     // state stops changing within EPSILON.
     void simulateMarkov(int maxTicks) {
         final double EPSILON = 1e-9;
-        final List<String> nodes = new ArrayList<>(rivers.keySet());
-        nodes.addAll(dams.keySet());
+        final List<String> nodes = new ArrayList<>();
+        for (String n : rivers.keySet()) if (!disabledNodes.contains(n)) nodes.add(n);
+        for (String n : dams.keySet())   if (!disabledNodes.contains(n)) nodes.add(n);
 
         // Initial state vector
         Map<String, Double> mass = new LinkedHashMap<>();
@@ -328,6 +366,7 @@ class RiverSystem {
                     continue;
                 }
                 for (Edge e : outs) {
+                    if (!e.enabled) continue;
                     if (!next.containsKey(e.target)) continue;
                     next.put(e.target, next.get(e.target) + mass.get(src) * e.weight);
                 }
@@ -359,17 +398,15 @@ class RiverSystem {
     void simulateGrid(int maxTicks) {
         final double EPSILON = 1e-7;
 
-        final List<String> nodes = new ArrayList<>(rivers.keySet());
-        nodes.addAll(dams.keySet());
+        final List<String> nodes = new ArrayList<>();
+        for (String n : rivers.keySet()) if (!disabledNodes.contains(n)) nodes.add(n);
+        for (String n : dams.keySet())   if (!disabledNodes.contains(n)) nodes.add(n);
 
-        // Edge list: each entry is one undirected edge {a, b, conductance}.
-        // Direction in the source is ignored (grid mode treats arrows as
-        // bidirectional). Multiple edges between the same pair sum their
-        // conductances.
         Map<String, Double> edgeC = new LinkedHashMap<>();
         Map<String, String[]> edgeEnds = new LinkedHashMap<>();
         for (Map.Entry<String, List<Edge>> entry : connections.entrySet()) {
             for (Edge e : entry.getValue()) {
+                if (!e.enabled) continue;
                 String a = entry.getKey();
                 String b = e.target;
                 String key = a.compareTo(b) <= 0 ? a + "|" + b : b + "|" + a;

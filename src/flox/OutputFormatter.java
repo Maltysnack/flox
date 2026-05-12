@@ -117,12 +117,14 @@ class OutputFormatter {
         int locWidth = 8; // minimum, supports "Location"
         for (River r : system.rivers.values()) {
             if (r.name.equals(finalOutlet)) continue;
+            if (system.disabledNodes.contains(r.name)) continue;
             locWidth = Math.max(locWidth, r.name.length());
             for (int day = 0; day < 10; day++) {
                 valWidth = Math.max(valWidth, String.format("%.1f", r.dailyFlow[day]).length());
             }
         }
         for (Dam d : system.dams.values()) {
+            if (system.disabledNodes.contains(d.name)) continue;
             locWidth = Math.max(locWidth, d.name.length());
             for (int day = 0; day < 10; day++) {
                 valWidth = Math.max(valWidth, String.format("%.1f", d.dailyOutflow[day]).length());
@@ -161,6 +163,7 @@ class OutputFormatter {
         // Rivers (skip the final outlet; printed separately as cumulative)
         for (River r : system.rivers.values()) {
             if (r.name.equals(finalOutlet)) continue;
+            if (system.disabledNodes.contains(r.name)) continue;
             System.out.print(padRight(r.name, locWidth));
             for (int day = 0; day < 10; day++) {
                 String val = String.format("%.1f", r.dailyFlow[day]);
@@ -171,6 +174,7 @@ class OutputFormatter {
 
         // Dams
         for (Dam d : system.dams.values()) {
+            if (system.disabledNodes.contains(d.name)) continue;
             System.out.print(padRight(d.name, locWidth));
             for (int day = 0; day < 10; day++) {
                 String val = String.format("%.1f", d.dailyOutflow[day]);
@@ -306,7 +310,8 @@ class OutputFormatter {
     static void printGridMap(RiverSystem system) {
         System.out.println("\n=== GRID: " + system.name + " ===\n");
 
-        // Nodes section, classified as generator / load / relay.
+        // Nodes section, classified as generator / load / relay. Disabled
+        // nodes carry a "(disabled)" tag.
         System.out.println("Nodes (" + system.rivers.size() + "):");
         int nameWidth = 4;
         for (String n : system.rivers.keySet()) nameWidth = Math.max(nameWidth, n.length());
@@ -315,14 +320,18 @@ class OutputFormatter {
             if (r.supply > 0) tag = "generator  " + signedFmt(r.supply);
             else if (r.supply < 0) tag = "load       " + signedFmt(r.supply);
             else tag = "relay";
-            System.out.println("  " + padRight(r.name, nameWidth) + "  " + tag);
+            String suffix = system.disabledNodes.contains(r.name) ? "  (disabled)" : "";
+            System.out.println("  " + padRight(r.name, nameWidth) + "  " + tag + suffix);
         }
         System.out.println();
 
         // Edges section. In grid mode, arrows are bidirectional.
         // We reduce duplicate (a,b) pairs; multiple edges sum conductance.
+        // An edge counts as disabled if any of its underlying directional
+        // edges is disabled or if either endpoint is disabled.
         Map<String, Double> edgeC = new LinkedHashMap<>();
         Map<String, String[]> edgeEnds = new LinkedHashMap<>();
+        Map<String, Boolean> edgeDisabled = new LinkedHashMap<>();
         for (Map.Entry<String, List<RiverSystem.Edge>> entry : system.connections.entrySet()) {
             for (RiverSystem.Edge e : entry.getValue()) {
                 String a = entry.getKey();
@@ -330,21 +339,29 @@ class OutputFormatter {
                 String key = a.compareTo(b) <= 0 ? a + "|" + b : b + "|" + a;
                 edgeC.merge(key, e.weight, Double::sum);
                 edgeEnds.putIfAbsent(key, new String[] { a, b });
+                boolean disabled = !e.enabled
+                        || system.disabledNodes.contains(a)
+                        || system.disabledNodes.contains(b);
+                edgeDisabled.merge(key, disabled, (x, y) -> x || y);
             }
         }
         System.out.println("Edges (" + edgeC.size() + "):");
         for (Map.Entry<String, String[]> entry : edgeEnds.entrySet()) {
             String[] ends = entry.getValue();
             double c = edgeC.get(entry.getKey());
+            String suffix = edgeDisabled.get(entry.getKey()) ? "   (disabled)" : "";
             System.out.println("  " + padRight(ends[0], nameWidth) + " <-> "
-                    + padRight(ends[1], nameWidth) + "   c=" + formatWeight(c));
+                    + padRight(ends[1], nameWidth) + "   c=" + formatWeight(c) + suffix);
         }
         System.out.println();
 
-        // Supply balance check.
+        // Supply balance check, against the post-disable network.
         double sum = 0;
-        for (River r : system.rivers.values()) sum += r.supply;
-        String tag = Math.abs(sum) < 1e-6 ? " ✓ (balanced)" : " ✗ (unbalanced!)";
+        for (River r : system.rivers.values()) {
+            if (system.disabledNodes.contains(r.name)) continue;
+            sum += r.supply;
+        }
+        String tag = Math.abs(sum) < 1e-6 ? " ✓ (balanced)" : " ✗ (unbalanced)";
         System.out.println("Net supply: " + formatWeight(sum) + tag);
         System.out.println();
     }

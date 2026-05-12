@@ -14,6 +14,7 @@ const KEYWORDS: Record<string, TokenType> = {
   node: TokenType.NODE,
   mode: TokenType.MODE,
   start: TokenType.START,
+  disable: TokenType.DISABLE,
 };
 
 export class Scanner {

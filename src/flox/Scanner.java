@@ -21,6 +21,7 @@ class Scanner {
         keywords.put("node", TokenType.NODE);
         keywords.put("mode", TokenType.MODE);
         keywords.put("start", TokenType.START);
+        keywords.put("disable", TokenType.DISABLE);
     }
 
     private final String source;

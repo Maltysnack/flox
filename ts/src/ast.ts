@@ -14,6 +14,7 @@ export type AstNode =
   | NodeDecl
   | Chain
   | StartStmt
+  | DisableStmt
   | MapStmt
   | ListStmt
   | PrintStmt
@@ -74,6 +75,13 @@ export interface StartStmt {
   readonly kind: "StartStmt";
   readonly node: Token;
   readonly mass: number;
+}
+
+export interface DisableStmt {
+  readonly kind: "DisableStmt";
+  readonly first: Token;
+  readonly second: Token | null;  // null = node disable
+  readonly forward: boolean;      // ignored if second is null
 }
 
 export interface MapStmt {

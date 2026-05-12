@@ -36,6 +36,7 @@ class Parser {
             if (match(OUTLET))   return outletDeclaration();
             if (match(NODE))     return nodeDeclaration();
             if (match(START))    return startStatement();
+            if (match(DISABLE))  return disableStatement();
             if (match(MAP))      return mapStatement();
             if (match(LIST))     return listStatement();
             if (match(PRINT))    return printStatement();
@@ -103,6 +104,24 @@ class Parser {
         Token name = consume(IDENTIFIER, "Expect mode name (e.g. river, markov).");
         consume(SEMICOLON, "Expect ';' after mode name.");
         return new Ast.ModeDecl(name);
+    }
+
+    // disable Name;
+    // disable A -> B;
+    // disable A <- B;
+    private Ast disableStatement() {
+        Token first = consume(IDENTIFIER, "Expect node name after 'disable'.");
+        Token second = null;
+        boolean forward = true;
+        if (match(ARROW)) {
+            forward = true;
+            second = consume(IDENTIFIER, "Expect node name after '->' in 'disable'.");
+        } else if (match(LARROW)) {
+            forward = false;
+            second = consume(IDENTIFIER, "Expect node name after '<-' in 'disable'.");
+        }
+        consume(SEMICOLON, "Expect ';' after disable statement.");
+        return new Ast.DisableStmt(first, second, forward);
     }
 
     // start NodeName 1.0;
@@ -351,6 +370,7 @@ class Parser {
                 case OUTLET:
                 case NODE:
                 case START:
+                case DISABLE:
                 case MAP:
                 case LIST:
                 case PRINT:

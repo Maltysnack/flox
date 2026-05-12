@@ -118,6 +118,7 @@ export function printFlowTable(
   let locWidth = 8; // minimum, supports "Location"
   for (const r of system.rivers.values()) {
     if (r.name === finalOutlet) continue;
+    if (system.disabledNodes.has(r.name)) continue;
     if (r.name.length > locWidth) locWidth = r.name.length;
     for (let day = 0; day < 10; day++) {
       const w = fmtFixed(r.dailyFlow[day]!, 1).length;
@@ -125,6 +126,7 @@ export function printFlowTable(
     }
   }
   for (const d of system.dams.values()) {
+    if (system.disabledNodes.has(d.name)) continue;
     if (d.name.length > locWidth) locWidth = d.name.length;
     for (let day = 0; day < 10; day++) {
       const w = fmtFixed(d.dailyOutflow[day]!, 1).length;
@@ -165,6 +167,7 @@ export function printFlowTable(
 
   for (const r of system.rivers.values()) {
     if (r.name === finalOutlet) continue;
+    if (system.disabledNodes.has(r.name)) continue;
     o.print(padRight(r.name, locWidth));
     for (let day = 0; day < 10; day++) {
       o.print("|  " + padLeft(fmtFixed(r.dailyFlow[day]!, 1), valWidth) + " ");
@@ -173,6 +176,7 @@ export function printFlowTable(
   }
 
   for (const d of system.dams.values()) {
+    if (system.disabledNodes.has(d.name)) continue;
     o.print(padRight(d.name, locWidth));
     for (let day = 0; day < 10; day++) {
       o.print("|  " + padLeft(fmtFixed(d.dailyOutflow[day]!, 1), valWidth) + " ");
@@ -312,33 +316,44 @@ export function printGridMap(o: Output, system: RiverSystem): void {
     if (r.supply > 0) tag = "generator  " + signedFmt(r.supply);
     else if (r.supply < 0) tag = "load       " + signedFmt(r.supply);
     else tag = "relay";
-    o.println("  " + padRight(r.name, nameWidth) + "  " + tag);
+    const suffix = system.disabledNodes.has(r.name) ? "  (disabled)" : "";
+    o.println("  " + padRight(r.name, nameWidth) + "  " + tag + suffix);
   }
   o.println("");
 
-  // Reduce parallel edges; ignore arrow direction.
+  // Reduce parallel edges; ignore arrow direction. Edges incident on a
+  // disabled node, or marked disabled, render with a "(disabled)" tag.
   const edgeC = new Map<string, number>();
   const edgeEnds = new Map<string, [string, string]>();
+  const edgeDisabled = new Map<string, boolean>();
   for (const [from, edges] of system.connections) {
     for (const e of edges) {
       const key = from <= e.target ? `${from}|${e.target}` : `${e.target}|${from}`;
       edgeC.set(key, (edgeC.get(key) ?? 0) + e.weight);
       if (!edgeEnds.has(key)) edgeEnds.set(key, [from, e.target]);
+      const disabled = !e.enabled
+        || system.disabledNodes.has(from)
+        || system.disabledNodes.has(e.target);
+      edgeDisabled.set(key, (edgeDisabled.get(key) ?? false) || disabled);
     }
   }
   o.println("Edges (" + edgeC.size + "):");
   for (const [key, ends] of edgeEnds) {
     const c = edgeC.get(key)!;
+    const suffix = edgeDisabled.get(key) ? "   (disabled)" : "";
     o.println(
       "  " + padRight(ends[0], nameWidth) + " <-> " +
-      padRight(ends[1], nameWidth) + "   c=" + formatWeight(c),
+      padRight(ends[1], nameWidth) + "   c=" + formatWeight(c) + suffix,
     );
   }
   o.println("");
 
   let sum = 0;
-  for (const r of system.rivers.values()) sum += r.supply;
-  const tag = Math.abs(sum) < 1e-6 ? " ✓ (balanced)" : " ✗ (unbalanced!)";
+  for (const r of system.rivers.values()) {
+    if (system.disabledNodes.has(r.name)) continue;
+    sum += r.supply;
+  }
+  const tag = Math.abs(sum) < 1e-6 ? " ✓ (balanced)" : " ✗ (unbalanced)";
   o.println("Net supply: " + formatWeight(sum) + tag);
   o.println("");
 }

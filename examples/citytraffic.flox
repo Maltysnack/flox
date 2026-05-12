@@ -28,5 +28,10 @@ node Downtown;
 node Office     { supply: -45 }
 node Industrial { supply: -45 }
 
+// Scenario: the express shortcut from EastHwy to Office is closed for
+// roadworks today. All east-side traffic has to go via Downtown.
+// Compare with and without the next line to see the impact.
+disable EastHwy -> Office;
+
 map MorningCommute;
 print MorningCommute 500;

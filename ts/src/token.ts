@@ -32,6 +32,7 @@ export enum TokenType {
   NODE = "NODE",
   MODE = "MODE",
   START = "START",
+  DISABLE = "DISABLE",
 
   EOF = "EOF",
 }

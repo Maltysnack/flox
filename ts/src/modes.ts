@@ -16,7 +16,7 @@ import {
 import { Mode, RiverSystem } from "./runtime.ts";
 
 export interface ModeStrategy {
-  validate(s: RiverSystem): void;
+  validate(s: RiverSystem, errs: string[]): void;
   run(s: RiverSystem, arg: number[]): void;
   defaultArg(): number[];
   printMap(o: Output, s: RiverSystem): void;
@@ -24,7 +24,7 @@ export interface ModeStrategy {
 }
 
 const river: ModeStrategy = {
-  validate(_s) { /* no-op */ },
+  validate(_s, _errs) { /* no-op */ },
   run(s, arg) { s.simulate(arg); },
   defaultArg() { return [1.0]; },
   printMap(o, s) { printRiverMap(o, s); },
@@ -32,7 +32,7 @@ const river: ModeStrategy = {
 };
 
 const markov: ModeStrategy = {
-  validate(s) {
+  validate(s, errs) {
     for (const name of s.initialMass.keys()) {
       if (!s.rivers.has(name) && !s.dams.has(name)) {
         throw new Error(
@@ -41,26 +41,47 @@ const markov: ModeStrategy = {
       }
     }
     let totalInitial = 0;
-    for (const m of s.initialMass.values()) totalInitial += m;
+    for (const [name, m] of s.initialMass) {
+      if (s.disabledNodes.has(name)) continue;
+      totalInitial += m;
+    }
     if (totalInitial === 0) {
       throw new Error(
-        `Markov system '${s.name}' has no initial mass. Use 'start NodeName 1.0;' to set one.`,
+        `Markov system '${s.name}' has no initial mass on any active node. Use 'start NodeName 1.0;' to set one.`,
       );
     }
+    // Per-source sum-to-1, considering only enabled edges. If any
+    // element is disabled the user is exploring a scenario; soften
+    // mismatches to a warning rather than an error.
+    let softened = s.disabledNodes.size > 0;
+    if (!softened) {
+      for (const edges of s.connections.values()) {
+        for (const e of edges) if (!e.enabled) { softened = true; break; }
+        if (softened) break;
+      }
+    }
     for (const [src, edges] of s.connections) {
+      if (s.disabledNodes.has(src)) continue;
       let sum = 0;
+      let anyEnabled = false;
       const lines: number[] = [];
       for (const e of edges) {
+        if (!e.enabled) continue;
+        anyEnabled = true;
         sum += e.weight;
         if (e.op) lines.push(e.op.line);
       }
+      if (!anyEnabled) continue;
       if (Math.abs(sum - 1.0) > 1e-6) {
         const where = lines.length > 0
           ? ` (${lines.map(l => "line " + l).join(", ")})`
           : "";
-        throw new Error(
-          `Markov system '${s.name}': outgoing weights from '${src}'${where} sum to ${sum}, not 1.0.`,
-        );
+        const msg = `Markov system '${s.name}': outgoing weights from '${src}'${where} sum to ${sum}, not 1.0.`;
+        if (softened) {
+          errs.push(`Note (scenario): ${msg}\n`);
+        } else {
+          throw new Error(msg);
+        }
       }
     }
   },
@@ -74,24 +95,35 @@ const markov: ModeStrategy = {
 };
 
 const grid: ModeStrategy = {
-  validate(s) {
+  validate(s, errs) {
     let total = 0;
     let hasSupply = false;
     for (const r of s.rivers.values()) {
+      if (s.disabledNodes.has(r.name)) continue;
       total += r.supply;
       if (r.supply !== 0) hasSupply = true;
     }
     if (!hasSupply) {
       throw new Error(
-        `Grid system '${s.name}' has no supply set on any node. ` +
+        `Grid system '${s.name}' has no supply set on any active node. ` +
         `Use 'node X { supply: N }' for generators (+) or loads (-).`,
       );
     }
+    let softened = s.disabledNodes.size > 0;
+    if (!softened) {
+      for (const edges of s.connections.values()) {
+        for (const e of edges) if (!e.enabled) { softened = true; break; }
+        if (softened) break;
+      }
+    }
     if (Math.abs(total) > 1e-6) {
-      throw new Error(
-        `Grid system '${s.name}': supplies do not balance (sum = ${total}). ` +
-        `Generators (+) and loads (-) must sum to zero.`,
-      );
+      const msg = `Grid system '${s.name}': supplies do not balance (sum = ${formatTotal(total)} after disabling). ` +
+        `Generators (+) and loads (-) must sum to zero.`;
+      if (softened) {
+        errs.push(`Note (scenario): ${msg}\n`);
+      } else {
+        throw new Error(msg);
+      }
     }
   },
   run(s, arg) {
@@ -102,5 +134,11 @@ const grid: ModeStrategy = {
   printMap(o, s) { printGridMap(o, s); },
   printResult(o, s, _arg) { printGridState(o, s); },
 };
+
+// Java prints "-100.0" for a whole double; mirror that in TS so the
+// stderr messages compare byte-identical across backends.
+function formatTotal(n: number): string {
+  return Number.isInteger(n) ? n.toFixed(1) : String(n);
+}
 
 export const STRATEGIES: Record<Mode, ModeStrategy> = { river, markov, grid };

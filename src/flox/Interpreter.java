@@ -8,11 +8,20 @@ class Interpreter implements Ast.Visitor<Void> {
     // Per-system pending chains, kept between phases.
     private final Map<String, List<Ast.Chain>> pendingChains = new HashMap<>();
 
+    // Per-system pending disable statements. Applied after chain
+    // resolution; matched against the resolved node/edge set.
+    private final Map<String, List<Ast.DisableStmt>> pendingDisables = new HashMap<>();
+
     private RiverSystem currentSystem = null;
     private Phase phase = Phase.COLLECT;
     // File-level mode. Set by `mode <name>;`. Applied to every system at
     // the end of phase 1. Default is RIVER.
     private RiverSystem.Mode fileMode = RiverSystem.Mode.RIVER;
+
+    // Stderr buffer. Validators and the top-level catch push lines here;
+    // we flush at the end of interpret() so the byte ordering matches
+    // the TypeScript port (which buffers similarly).
+    private final List<String> errs = new ArrayList<>();
 
     private enum Phase {
         COLLECT,  // gather declarations and chains
@@ -33,9 +42,13 @@ class Interpreter implements Ast.Visitor<Void> {
 
             // Resolve: wire up pending chains against each system's symbol table.
             resolveChains();
+            applyDisables();
 
-            // Per-mode validation pass.
-            for (RiverSystem s : systems.values()) s.mode.validate(s);
+            // Per-mode validation pass. Validators check whether the
+            // system has disabled elements and soften their requirements
+            // accordingly (a user explicitly disabling things is
+            // modelling a scenario and the model may be unbalanced).
+            for (RiverSystem s : systems.values()) s.mode.validate(s, errs);
 
             // Phase 2: identify roots once per system, then execute actions.
             for (RiverSystem s : systems.values()) {
@@ -47,7 +60,13 @@ class Interpreter implements Ast.Visitor<Void> {
                 if (stmt != null) execute(stmt);
             }
         } catch (RuntimeException error) {
-            System.err.println("Runtime error: " + error.getMessage());
+            errs.add("Runtime error: " + error.getMessage() + "\n");
+        } finally {
+            // Flush the buffered stderr after stdout is done, so both
+            // backends produce identical interleaving when captured with
+            // 2>&1 by the test runner.
+            for (String e : errs) System.err.print(e);
+            errs.clear();
         }
     }
 
@@ -61,6 +80,7 @@ class Interpreter implements Ast.Visitor<Void> {
         if (phase == Phase.COLLECT) {
             currentSystem = systems.computeIfAbsent(name, RiverSystem::new);
             pendingChains.computeIfAbsent(name, k -> new ArrayList<>());
+            pendingDisables.computeIfAbsent(name, k -> new ArrayList<>());
         } else {
             currentSystem = systems.get(name);
         }
@@ -157,6 +177,14 @@ class Interpreter implements Ast.Visitor<Void> {
     }
 
     @Override
+    public Void visitDisableStmt(Ast.DisableStmt stmt) {
+        if (phase != Phase.COLLECT) return null;
+        requireSystem(stmt.first);
+        pendingDisables.get(currentSystem.name).add(stmt);
+        return null;
+    }
+
+    @Override
     public Void visitStartStmt(Ast.StartStmt stmt) {
         if (phase != Phase.COLLECT) return null;
         requireSystem(stmt.node);
@@ -190,6 +218,65 @@ class Interpreter implements Ast.Visitor<Void> {
                     Token to   = arrow.forward ? b : a;
                     double weight = arrow.weight != null ? arrow.weight : 1.0;
                     system.addConnection(from.lexeme, to.lexeme, weight, arrow.op);
+                }
+            }
+        }
+    }
+
+    // Apply pending disable statements after chains are resolved. Marks
+    // edges as enabled=false; marks nodes by adding to disabledNodes
+    // and disabling all incident edges in both directions.
+    private void applyDisables() {
+        for (Map.Entry<String, List<Ast.DisableStmt>> entry : pendingDisables.entrySet()) {
+            RiverSystem system = systems.get(entry.getKey());
+            if (system == null) continue;
+            for (Ast.DisableStmt stmt : entry.getValue()) {
+                if (stmt.isNode()) {
+                    String name = stmt.first.lexeme;
+                    if (!nodeDefined(system, name)) {
+                        throw new RuntimeException(
+                                "disable references undeclared node '" + name
+                                        + "' (line " + stmt.first.line + ") in system '"
+                                        + system.name + "'.");
+                    }
+                    system.disabledNodes.add(name);
+                    // Disable all outgoing edges from this node.
+                    List<RiverSystem.Edge> outs = system.connections.get(name);
+                    if (outs != null) for (RiverSystem.Edge e : outs) e.enabled = false;
+                    // Disable all incoming edges targeting this node.
+                    for (List<RiverSystem.Edge> es : system.connections.values()) {
+                        for (RiverSystem.Edge e : es) {
+                            if (e.target.equals(name)) e.enabled = false;
+                        }
+                    }
+                } else {
+                    String a = stmt.first.lexeme;
+                    String b = stmt.second.lexeme;
+                    String from = stmt.forward ? a : b;
+                    String to   = stmt.forward ? b : a;
+                    if (!nodeDefined(system, from) || !nodeDefined(system, to)) {
+                        throw new RuntimeException(
+                                "disable references undeclared node in edge '"
+                                        + from + " -> " + to + "' (line "
+                                        + stmt.first.line + ") in system '"
+                                        + system.name + "'.");
+                    }
+                    List<RiverSystem.Edge> outs = system.connections.get(from);
+                    boolean found = false;
+                    if (outs != null) {
+                        for (RiverSystem.Edge e : outs) {
+                            if (e.target.equals(to)) {
+                                e.enabled = false;
+                                found = true;
+                            }
+                        }
+                    }
+                    if (!found) {
+                        throw new RuntimeException(
+                                "disable references edge '" + from + " -> " + to
+                                        + "' (line " + stmt.first.line + ") which is not declared in system '"
+                                        + system.name + "'.");
+                    }
                 }
             }
         }

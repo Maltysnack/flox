@@ -1,6 +1,6 @@
 // Two-pass interpreter. Mechanical port of Interpreter.java.
 
-import { AstNode, Chain } from "./ast.ts";
+import { AstNode, Chain, DisableStmt } from "./ast.ts";
 import { STRATEGIES } from "./modes.ts";
 import { Output, printHelp, printList } from "./output.ts";
 import { Dam, Mode, River, RiverSystem } from "./runtime.ts";
@@ -14,6 +14,7 @@ enum Phase {
 export class Interpreter {
   private readonly systems = new Map<string, RiverSystem>();
   private readonly pendingChains = new Map<string, Chain[]>();
+  private readonly pendingDisables = new Map<string, DisableStmt[]>();
   private currentSystem: RiverSystem | null = null;
   private phase: Phase = Phase.COLLECT;
   private fileMode: Mode = "river";
@@ -45,7 +46,8 @@ export class Interpreter {
     }
     for (const s of this.systems.values()) s.mode = this.fileMode;
     this.resolveChains();
-    for (const s of this.systems.values()) STRATEGIES[s.mode].validate(s);
+    this.applyDisables();
+    for (const s of this.systems.values()) STRATEGIES[s.mode].validate(s, this.errs);
     for (const s of this.systems.values()) s.identifyRoots();
   }
 
@@ -73,6 +75,7 @@ export class Interpreter {
             s = new RiverSystem(name);
             this.systems.set(name, s);
             this.pendingChains.set(name, []);
+            this.pendingDisables.set(name, []);
           }
           this.currentSystem = s;
         } else {
@@ -168,6 +171,13 @@ export class Interpreter {
         return;
       }
 
+      case "DisableStmt": {
+        if (this.phase !== Phase.COLLECT) return;
+        const sys = this.requireSystem(stmt.first);
+        this.pendingDisables.get(sys.name)!.push(stmt);
+        return;
+      }
+
       case "StartStmt": {
         if (this.phase !== Phase.COLLECT) return;
         const sys = this.requireSystem(stmt.node);
@@ -230,6 +240,53 @@ export class Interpreter {
           const to = arrow.forward ? b : a;
           const weight = arrow.weight != null ? arrow.weight : 1.0;
           system.addConnection(from.lexeme, to.lexeme, weight, arrow.op);
+        }
+      }
+    }
+  }
+
+  private applyDisables(): void {
+    for (const [sysName, stmts] of this.pendingDisables) {
+      const system = this.systems.get(sysName);
+      if (!system) continue;
+      for (const stmt of stmts) {
+        if (stmt.second === null) {
+          // Node disable.
+          const name = stmt.first.lexeme;
+          if (!this.nodeDefined(system, name)) {
+            throw new Error(
+              `disable references undeclared node '${name}' (line ${stmt.first.line}) in system '${system.name}'.`,
+            );
+          }
+          system.disabledNodes.add(name);
+          const outs = system.connections.get(name);
+          if (outs) for (const e of outs) e.enabled = false;
+          for (const es of system.connections.values()) {
+            for (const e of es) if (e.target === name) e.enabled = false;
+          }
+        } else {
+          // Edge disable.
+          const a = stmt.first.lexeme;
+          const b = stmt.second.lexeme;
+          const from = stmt.forward ? a : b;
+          const to   = stmt.forward ? b : a;
+          if (!this.nodeDefined(system, from) || !this.nodeDefined(system, to)) {
+            throw new Error(
+              `disable references undeclared node in edge '${from} -> ${to}' (line ${stmt.first.line}) in system '${system.name}'.`,
+            );
+          }
+          const outs = system.connections.get(from);
+          let found = false;
+          if (outs) {
+            for (const e of outs) {
+              if (e.target === to) { e.enabled = false; found = true; }
+            }
+          }
+          if (!found) {
+            throw new Error(
+              `disable references edge '${from} -> ${to}' (line ${stmt.first.line}) which is not declared in system '${system.name}'.`,
+            );
+          }
         }
       }
     }

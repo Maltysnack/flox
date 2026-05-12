@@ -27,6 +27,7 @@ export interface GraphNode {
   name: string;
   kind: NodeKind;
   supply: number;
+  disabled: boolean;
 }
 
 export interface GraphEdge {
@@ -34,6 +35,7 @@ export interface GraphEdge {
   to: string;
   weight: number;
   directed: boolean;
+  disabled: boolean;
 }
 
 export interface SystemGraph {
@@ -115,17 +117,31 @@ function systemToGraph(sys: RiverSystem): SystemGraph {
       name: r.name,
       kind: classifyRiver(r, sys.mode),
       supply: r.supply,
+      disabled: sys.disabledNodes.has(r.name),
     });
   }
   for (const d of sys.dams.values()) {
-    nodes.push({ name: d.name, kind: "dam", supply: 0 });
+    nodes.push({
+      name: d.name,
+      kind: "dam",
+      supply: 0,
+      disabled: sys.disabledNodes.has(d.name),
+    });
   }
 
   const directed = sys.mode !== "grid";
   const edges: GraphEdge[] = [];
   for (const [from, outEdges] of sys.connections) {
     for (const e of outEdges) {
-      edges.push({ from, to: e.target, weight: e.weight, directed });
+      const incidentDisabled =
+        sys.disabledNodes.has(from) || sys.disabledNodes.has(e.target);
+      edges.push({
+        from,
+        to: e.target,
+        weight: e.weight,
+        directed,
+        disabled: !e.enabled || incidentDisabled,
+      });
     }
   }
 

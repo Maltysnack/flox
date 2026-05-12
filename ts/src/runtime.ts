@@ -89,6 +89,7 @@ export interface Edge {
   target: string;
   weight: number;
   op: Token | null; // arrow token that declared this edge, for diagnostics
+  enabled: boolean;
 }
 
 export class RiverSystem {
@@ -97,6 +98,9 @@ export class RiverSystem {
   dams: Map<string, Dam> = new Map();
   connections: Map<string, Edge[]> = new Map();
   roots: string[] = [];
+  // Nodes explicitly disabled via 'disable' statements. Skipped by every
+  // simulator; remain in rivers/dams so the visualisation can dim them.
+  disabledNodes: Set<string> = new Set();
 
   // Markov state
   initialMass: Map<string, number> = new Map();
@@ -126,16 +130,20 @@ export class RiverSystem {
       downstream = [];
       this.connections.set(from, downstream);
     }
-    downstream.push({ target: to, weight, op });
+    downstream.push({ target: to, weight, op, enabled: true });
   }
 
   identifyRoots(): void {
     this.roots = [];
     const hasUpstream = new Set<string>();
     for (const edges of this.connections.values()) {
-      for (const e of edges) hasUpstream.add(e.target);
+      for (const e of edges) {
+        if (!e.enabled) continue;
+        hasUpstream.add(e.target);
+      }
     }
     for (const r of this.rivers.values()) {
+      if (this.disabledNodes.has(r.name)) continue;
       if (!hasUpstream.has(r.name) && !r.isTerminator()) {
         this.roots.push(r.name);
       }
@@ -160,10 +168,12 @@ export class RiverSystem {
       const flowThisDay = new Map<string, number>();
 
       for (const node of this.getTopologicalOrder()) {
+        if (this.disabledNodes.has(node)) continue;
         let flow = 0;
 
         for (const [from, edges] of this.connections) {
           for (const e of edges) {
+            if (!e.enabled) continue;
             if (e.target === node) {
               flow += (flowThisDay.get(from) ?? 0) * e.weight;
             }
@@ -194,7 +204,9 @@ export class RiverSystem {
   // maxTicks or when the state stops changing within EPSILON.
   simulateMarkov(maxTicks: number): void {
     const EPSILON = 1e-9;
-    const nodes: string[] = [...this.rivers.keys(), ...this.dams.keys()];
+    const nodes: string[] = [];
+    for (const n of this.rivers.keys()) if (!this.disabledNodes.has(n)) nodes.push(n);
+    for (const n of this.dams.keys())   if (!this.disabledNodes.has(n)) nodes.push(n);
 
     let mass = new Map<string, number>();
     for (const n of nodes) mass.set(n, this.initialMass.get(n) ?? 0);
@@ -219,6 +231,7 @@ export class RiverSystem {
           continue;
         }
         for (const e of outs) {
+          if (!e.enabled) continue;
           if (!next.has(e.target)) continue;
           next.set(e.target, (next.get(e.target) ?? 0) + (mass.get(src) ?? 0) * e.weight);
         }
@@ -246,7 +259,9 @@ export class RiverSystem {
   simulateGrid(maxTicks: number): void {
     const EPSILON = 1e-7;
 
-    const nodes: string[] = [...this.rivers.keys(), ...this.dams.keys()];
+    const nodes: string[] = [];
+    for (const n of this.rivers.keys()) if (!this.disabledNodes.has(n)) nodes.push(n);
+    for (const n of this.dams.keys())   if (!this.disabledNodes.has(n)) nodes.push(n);
 
     // Reduce parallel edges and ignore arrow direction (grid mode is
     // bidirectional). edgeKey = "alphabetically-first|alphabetically-second".
@@ -254,6 +269,7 @@ export class RiverSystem {
     const edgeEnds = new Map<string, [string, string]>();
     for (const [from, edges] of this.connections) {
       for (const e of edges) {
+        if (!e.enabled) continue;
         const key = from <= e.target ? `${from}|${e.target}` : `${e.target}|${from}`;
         edgeC.set(key, (edgeC.get(key) ?? 0) + e.weight);
         if (!edgeEnds.has(key)) edgeEnds.set(key, [from, e.target]);
@@ -328,6 +344,7 @@ export class RiverSystem {
     for (const n of allNodes) inDegree.set(n, 0);
     for (const edges of this.connections.values()) {
       for (const e of edges) {
+        if (!e.enabled) continue;
         inDegree.set(e.target, (inDegree.get(e.target) ?? 0) + 1);
       }
     }
@@ -341,6 +358,7 @@ export class RiverSystem {
       const edges = this.connections.get(node);
       if (edges) {
         for (const e of edges) {
+          if (!e.enabled) continue;
           const d = (inDegree.get(e.target) ?? 0) - 1;
           inDegree.set(e.target, d);
           if (d === 0) queue.push(e.target);

@@ -21,6 +21,8 @@ abstract class Ast {
 
         R visitStartStmt(StartStmt stmt);
 
+        R visitDisableStmt(DisableStmt stmt);
+
         R visitMapStmt(MapStmt stmt);
 
         R visitListStmt(ListStmt stmt);
@@ -166,6 +168,28 @@ abstract class Ast {
         @Override
         public <R> R accept(Visitor<R> visitor) {
             return visitor.visitModeDecl(this);
+        }
+    }
+
+    // disable Name;            -> node disable
+    // disable A -> B;          -> edge disable, direction = forward
+    // disable A <- B;          -> edge disable, direction = backward (= edge B->A)
+    public static class DisableStmt extends Ast {
+        public final Token first;
+        public final Token second;   // null for node-disable
+        public final boolean forward; // ignored if second is null
+
+        public DisableStmt(Token first, Token second, boolean forward) {
+            this.first = first;
+            this.second = second;
+            this.forward = forward;
+        }
+
+        public boolean isNode() { return second == null; }
+
+        @Override
+        public <R> R accept(Visitor<R> visitor) {
+            return visitor.visitDisableStmt(this);
         }
     }
 

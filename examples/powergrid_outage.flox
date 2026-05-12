@@ -1,0 +1,29 @@
+// PowerGrid with an outage: the main plant trips offline. The grid is
+// physically the same; only the operational state differs.
+//
+// `disable Name;` removes a node from the simulation but leaves the
+// declaration in place so the visual layer shows it dimmed. Grid mode
+// softens its supply-balance check when anything is disabled (a user
+// modelling a scenario is allowed to be unbalanced; we'd want to see
+// the levels going negative).
+mode grid;
+system Outage;
+
+Plant     -[5]-> Hub;
+Backup    -[2]-> Hub;
+Hub       -[3]-> NorthCity;
+Hub       -[3]-> SouthCity;
+NorthCity -[1]-> SouthCity;
+
+node Plant     { supply:  100 }
+node Backup    { supply:   30 }
+node Hub;
+node NorthCity { supply:  -65 }
+node SouthCity { supply:  -65 }
+
+// Main plant offline. Backup can't carry the full load; expect the
+// cities' levels to drift negative.
+disable Plant;
+
+map Outage;
+print Outage 500;

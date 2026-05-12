@@ -5,6 +5,7 @@ import {
   Chain,
   ChainEdge,
   DamDecl,
+  DisableStmt,
   HelpStmt,
   ListStmt,
   MapStmt,
@@ -46,6 +47,7 @@ export class Parser {
       if (this.match(TokenType.OUTLET)) return this.outletDeclaration();
       if (this.match(TokenType.NODE))   return this.nodeDeclaration();
       if (this.match(TokenType.START))  return this.startStatement();
+      if (this.match(TokenType.DISABLE)) return this.disableStatement();
       if (this.match(TokenType.MAP))    return this.mapStatement();
       if (this.match(TokenType.LIST))   return this.listStatement();
       if (this.match(TokenType.PRINT))  return this.printStatement();
@@ -64,6 +66,21 @@ export class Parser {
     const name = this.consume(TokenType.IDENTIFIER, "Expect mode name (e.g. river, markov).");
     this.consume(TokenType.SEMICOLON, "Expect ';' after mode name.");
     return { kind: "ModeDecl", mode: name };
+  }
+
+  private disableStatement(): DisableStmt {
+    const first = this.consume(TokenType.IDENTIFIER, "Expect node name after 'disable'.");
+    let second: Token | null = null;
+    let forward = true;
+    if (this.match(TokenType.ARROW)) {
+      forward = true;
+      second = this.consume(TokenType.IDENTIFIER, "Expect node name after '->' in 'disable'.");
+    } else if (this.match(TokenType.LARROW)) {
+      forward = false;
+      second = this.consume(TokenType.IDENTIFIER, "Expect node name after '<-' in 'disable'.");
+    }
+    this.consume(TokenType.SEMICOLON, "Expect ';' after disable statement.");
+    return { kind: "DisableStmt", first, second, forward };
   }
 
   private startStatement(): StartStmt {
@@ -356,6 +373,7 @@ export class Parser {
         case TokenType.OUTLET:
         case TokenType.NODE:
         case TokenType.START:
+        case TokenType.DISABLE:
         case TokenType.MAP:
         case TokenType.LIST:
         case TokenType.PRINT:
