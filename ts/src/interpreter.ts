@@ -25,31 +25,42 @@ export class Interpreter {
 
   interpret(statements: AstNode[]): void {
     try {
-      this.phase = Phase.COLLECT;
-      this.currentSystem = null;
-      for (const stmt of statements) {
-        if (stmt) this.execute(stmt);
-      }
-
-      // Apply file mode to every system before resolution.
-      for (const s of this.systems.values()) s.mode = this.fileMode;
-
-      this.resolveChains();
-
-      // Per-mode validation pass.
-      for (const s of this.systems.values()) STRATEGIES[s.mode].validate(s);
-
-      for (const s of this.systems.values()) s.identifyRoots();
-
-      this.phase = Phase.EXECUTE;
-      this.currentSystem = null;
-      for (const stmt of statements) {
-        if (stmt) this.execute(stmt);
-      }
+      this.collectAndResolve(statements);
+      this.executeAll(statements);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       this.errs.push("Runtime error: " + msg + "\n");
     }
+  }
+
+  // Phase 1: collect declarations, apply file mode, resolve chain edges,
+  // validate per-mode, identify roots. Stops before any list/map/print
+  // executes. Used by parseGraph() to extract the network structure
+  // without running the simulator.
+  collectAndResolve(statements: AstNode[]): void {
+    this.phase = Phase.COLLECT;
+    this.currentSystem = null;
+    for (const stmt of statements) {
+      if (stmt) this.execute(stmt);
+    }
+    for (const s of this.systems.values()) s.mode = this.fileMode;
+    this.resolveChains();
+    for (const s of this.systems.values()) STRATEGIES[s.mode].validate(s);
+    for (const s of this.systems.values()) s.identifyRoots();
+  }
+
+  executeAll(statements: AstNode[]): void {
+    this.phase = Phase.EXECUTE;
+    this.currentSystem = null;
+    for (const stmt of statements) {
+      if (stmt) this.execute(stmt);
+    }
+  }
+
+  // Read-only access to the systems map after collectAndResolve.
+  // Used by parseGraph(); not meant for general consumption.
+  getSystems(): ReadonlyMap<string, RiverSystem> {
+    return this.systems;
   }
 
   private execute(stmt: AstNode): void {
