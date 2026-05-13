@@ -268,7 +268,8 @@ export class Interpreter {
     }
   }
 
-  private scenarioClone(src: RiverSystem, overrides: OverrideSpec[]): RiverSystem {
+  // Public so parseGraph() can run scenarios and capture state.
+  scenarioClone(src: RiverSystem, overrides: OverrideSpec[]): RiverSystem {
     const supplyOverrides = new Map<string, number>();
     const extraDisableNodes = new Set<string>();
     const extraDisableEdges = new Set<string>();

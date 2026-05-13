@@ -1,6 +1,7 @@
 // Public entry point. Run a Flox program and capture its output.
 
 import { Interpreter } from "./interpreter.ts";
+import { STRATEGIES } from "./modes.ts";
 import { Parser } from "./parser.ts";
 import { Mode, River, RiverSystem } from "./runtime.ts";
 import { Scanner } from "./scanner.ts";
@@ -46,6 +47,13 @@ export type GraphOverride =
 export interface GraphScenario {
   label: string;
   overrides: GraphOverride[];
+  // Per-scenario simulation results. Populated by parseGraph after the
+  // scenarios are evaluated; lets the renderer label nodes with their
+  // equilibrium level and edges with their flow magnitude.
+  levels?: Record<string, number>;
+  flows?: Record<string, number>;
+  ticksRun?: number;
+  converged?: boolean;
 }
 
 export interface SystemGraph {
@@ -116,30 +124,67 @@ export function parseGraph(source: string): ParseGraphResult {
     errs.push("Runtime error: " + msg + "\n");
   }
 
-  // Walk the AST once to collect compare scenarios per system. Compare
-  // is an EXECUTE-phase statement so collectAndResolve hasn't visited
-  // it yet; we just pull the data out of the parsed AST directly.
+  // Walk the AST for compare statements. Compare is an EXECUTE-phase
+  // statement so collectAndResolve hasn't visited it yet. We pull the
+  // scenarios out of the parsed AST and, for each one, clone the base
+  // system, apply the overrides, and run the simulator to capture
+  // levels and flows. The renderer reads those to label nodes and
+  // edges with their equilibrium values per scenario.
   const scenariosBySystem = new Map<string, GraphScenario[]>();
   for (const stmt of ast) {
-    if (stmt && stmt.kind === "CompareStmt") {
-      const sysName = stmt.systemName.lexeme;
-      const sceneList = scenariosBySystem.get(sysName) ?? [];
-      for (const sc of stmt.scenarios) {
-        sceneList.push({
-          label: sc.label,
-          overrides: sc.overrides.map(o => {
-            if (o.kind === "disable-node") return { kind: "disable-node", name: o.name1.lexeme };
-            if (o.kind === "disable-edge") {
-              const from = o.forward ? o.name1.lexeme : o.name2.lexeme;
-              const to   = o.forward ? o.name2.lexeme : o.name1.lexeme;
-              return { kind: "disable-edge", from, to };
-            }
-            return { kind: "supply", name: o.name1.lexeme, value: o.value };
-          }),
-        });
+    if (!stmt || stmt.kind !== "CompareStmt") continue;
+    const sysName = stmt.systemName.lexeme;
+    const baseSys = interp.getSystems().get(sysName);
+    if (!baseSys) continue;
+    const strat = STRATEGIES[baseSys.mode];
+    const arg = stmt.ticks != null ? [stmt.ticks] : strat.defaultArg();
+
+    const sceneList = scenariosBySystem.get(sysName) ?? [];
+    for (const sc of stmt.scenarios) {
+      const overrides: GraphOverride[] = sc.overrides.map(o => {
+        if (o.kind === "disable-node") return { kind: "disable-node", name: o.name1.lexeme };
+        if (o.kind === "disable-edge") {
+          const from = o.forward ? o.name1.lexeme : o.name2.lexeme;
+          const to   = o.forward ? o.name2.lexeme : o.name1.lexeme;
+          return { kind: "disable-edge", from, to };
+        }
+        return { kind: "supply", name: o.name1.lexeme, value: o.value };
+      });
+
+      // Run the scenario to capture state. Swallow validation errors
+      // (they get surfaced through interpret() anyway via stderr).
+      let levels: Record<string, number> | undefined;
+      let flows: Record<string, number> | undefined;
+      let ticksRun: number | undefined;
+      let converged: boolean | undefined;
+      try {
+        const clone = interp.scenarioClone(baseSys, sc.overrides);
+        const localErrs: string[] = [];
+        strat.validate(clone, localErrs);
+        clone.identifyRoots();
+        strat.run(clone, arg);
+        if (baseSys.mode === "grid") {
+          levels = Object.fromEntries(clone.gridLevel);
+          flows = Object.fromEntries(clone.gridFlow);
+          ticksRun = clone.gridTicksRun;
+          converged = clone.gridConverged;
+        } else if (baseSys.mode === "markov") {
+          levels = {};
+          for (const [k, hist] of clone.markovHistory) {
+            levels[k] = hist[clone.markovTicksRun] ?? 0;
+          }
+          ticksRun = clone.markovTicksRun;
+          converged = clone.markovConverged;
+        }
+      } catch (_e) {
+        // Validation threw a hard error (rare in scenarios; softened by
+        // scenarioRun marker). Leave state undefined; renderer falls
+        // back to the topology-only view for this scenario.
       }
-      scenariosBySystem.set(sysName, sceneList);
+
+      sceneList.push({ label: sc.label, overrides, levels, flows, ticksRun, converged });
     }
+    scenariosBySystem.set(sysName, sceneList);
   }
 
   const systems: SystemGraph[] = [];
