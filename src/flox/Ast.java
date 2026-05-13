@@ -23,6 +23,8 @@ abstract class Ast {
 
         R visitDisableStmt(DisableStmt stmt);
 
+        R visitCompareStmt(CompareStmt stmt);
+
         R visitMapStmt(MapStmt stmt);
 
         R visitListStmt(ListStmt stmt);
@@ -190,6 +192,62 @@ abstract class Ast {
         @Override
         public <R> R accept(Visitor<R> visitor) {
             return visitor.visitDisableStmt(this);
+        }
+    }
+
+    // One override clause inside a `compare` scenario.
+    public static class OverrideSpec {
+        public enum Kind { DISABLE_NODE, DISABLE_EDGE, SUPPLY }
+        public final Kind kind;
+        public final Token name1;
+        public final Token name2;  // for DISABLE_EDGE; null otherwise
+        public final boolean forward;  // for DISABLE_EDGE
+        public final double value;  // for SUPPLY
+
+        private OverrideSpec(Kind kind, Token name1, Token name2, boolean forward, double value) {
+            this.kind = kind;
+            this.name1 = name1;
+            this.name2 = name2;
+            this.forward = forward;
+            this.value = value;
+        }
+
+        public static OverrideSpec disableNode(Token name) {
+            return new OverrideSpec(Kind.DISABLE_NODE, name, null, true, 0);
+        }
+        public static OverrideSpec disableEdge(Token a, Token b, boolean forward) {
+            return new OverrideSpec(Kind.DISABLE_EDGE, a, b, forward, 0);
+        }
+        public static OverrideSpec supply(Token name, double value) {
+            return new OverrideSpec(Kind.SUPPLY, name, null, true, value);
+        }
+    }
+
+    // One scenario inside a `compare`.
+    public static class Scenario {
+        public final String label;
+        public final List<OverrideSpec> overrides;
+        public Scenario(String label, List<OverrideSpec> overrides) {
+            this.label = label;
+            this.overrides = overrides;
+        }
+    }
+
+    // compare SystemName [ticks] as "label" [with override]*, "label" ...;
+    public static class CompareStmt extends Ast {
+        public final Token systemName;
+        public final Double ticks;
+        public final List<Scenario> scenarios;
+
+        public CompareStmt(Token systemName, Double ticks, List<Scenario> scenarios) {
+            this.systemName = systemName;
+            this.ticks = ticks;
+            this.scenarios = scenarios;
+        }
+
+        @Override
+        public <R> R accept(Visitor<R> visitor) {
+            return visitor.visitCompareStmt(this);
         }
     }
 

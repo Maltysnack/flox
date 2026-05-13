@@ -53,7 +53,7 @@ const markov: ModeStrategy = {
     // Per-source sum-to-1, considering only enabled edges. If any
     // element is disabled the user is exploring a scenario; soften
     // mismatches to a warning rather than an error.
-    let softened = s.disabledNodes.size > 0;
+    let softened = s.scenarioRun || s.disabledNodes.size > 0;
     if (!softened) {
       for (const edges of s.connections.values()) {
         for (const e of edges) if (!e.enabled) { softened = true; break; }
@@ -109,7 +109,7 @@ const grid: ModeStrategy = {
         `Use 'node X { supply: N }' for generators (+) or loads (-).`,
       );
     }
-    let softened = s.disabledNodes.size > 0;
+    let softened = s.scenarioRun || s.disabledNodes.size > 0;
     if (!softened) {
       for (const edges of s.connections.values()) {
         for (const e of edges) if (!e.enabled) { softened = true; break; }

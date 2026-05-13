@@ -1,0 +1,31 @@
+// Power-grid scenario comparison. The same network run under four
+// operating conditions side by side:
+//
+//   1. Baseline: everything online.
+//   2. Plant offline: the main generator trips; backup carries what it can.
+//   3. Backup boosted: someone scheduled extra backup capacity.
+//   4. Tie line cut: the North-South tie is severed (maintenance, fault).
+//
+// Each scenario clones the system, applies its overrides, and runs the
+// equilibrium solver. Output is a side-by-side table; nodes/edges
+// disabled in a given scenario show as "(off)".
+mode grid;
+system PowerGrid;
+
+Plant     -[5]-> Hub;
+Backup    -[2]-> Hub;
+Hub       -[3]-> NorthCity;
+Hub       -[3]-> SouthCity;
+NorthCity -[1]-> SouthCity;
+
+node Plant     { supply:  100 }
+node Backup    { supply:   30 }
+node Hub;
+node NorthCity { supply:  -65 }
+node SouthCity { supply:  -65 }
+
+compare PowerGrid 500 as
+    "Baseline",
+    "Plant offline"   with disable Plant,
+    "Backup boosted"  with Backup.supply = 80,
+    "Tie line cut"    with disable NorthCity -> SouthCity;

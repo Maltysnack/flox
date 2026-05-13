@@ -1,0 +1,26 @@
+
+=== COMPARE: PowerGrid ===
+
+Scenarios:
+  Baseline        191 ticks, converged
+  Plant offline   500 ticks, not yet converged
+  Backup boosted  500 ticks, not yet converged
+  Tie line cut    191 ticks, converged
+
+                          Baseline  Plant offline  Backup boosted  Tie line cut
+Levels:
+  Plant                     +21.67          (off)         +209.71        +21.67
+  Backup                    +16.67        -753.96         +226.71        +16.67
+  Hub                        +1.67        -781.46         +191.71         +1.67
+  NorthCity                 -20.00        -794.79         +166.71        -20.00
+  SouthCity                 -20.00        -794.79         +166.71        -20.00
+
+Flows (positive = first-to-second direction):
+  Plant -> Hub             +100.00          (off)          +90.00       +100.00
+  Backup -> Hub             +30.00         +55.00          +70.00        +30.00
+  Hub -> NorthCity          +65.00         +40.00          +75.00        +65.00
+  Hub -> SouthCity          +65.00         +40.00          +75.00        +65.00
+  NorthCity -> SouthCity      0.00           0.00            0.00         (off)
+
+Note (scenario): Grid system 'PowerGrid': supplies do not balance (sum = -100.0 after disabling). Generators (+) and loads (-) must sum to zero.
+Note (scenario): Grid system 'PowerGrid': supplies do not balance (sum = 50.0 after disabling). Generators (+) and loads (-) must sum to zero.

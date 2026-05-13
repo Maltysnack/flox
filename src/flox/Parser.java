@@ -37,6 +37,7 @@ class Parser {
             if (match(NODE))     return nodeDeclaration();
             if (match(START))    return startStatement();
             if (match(DISABLE))  return disableStatement();
+            if (match(COMPARE))  return compareStatement();
             if (match(MAP))      return mapStatement();
             if (match(LIST))     return listStatement();
             if (match(PRINT))    return printStatement();
@@ -104,6 +105,66 @@ class Parser {
         Token name = consume(IDENTIFIER, "Expect mode name (e.g. river, markov).");
         consume(SEMICOLON, "Expect ';' after mode name.");
         return new Ast.ModeDecl(name);
+    }
+
+    // compare SystemName [ticks] as
+    //   "label",
+    //   "label" with disable Plant,
+    //   "label" with Backup.supply = 80 with disable A -> B;
+    private Ast compareStatement() {
+        Token name = consume(IDENTIFIER, "Expect system name after 'compare'.");
+        Double ticks = null;
+        if (match(NUMBER)) {
+            ticks = (Double) previous().literal;
+        }
+        consume(AS, "Expect 'as' before the scenario list.");
+
+        List<Ast.Scenario> scenarios = new ArrayList<>();
+        scenarios.add(scenario());
+        while (match(COMMA)) {
+            scenarios.add(scenario());
+        }
+        consume(SEMICOLON, "Expect ';' after compare statement.");
+        return new Ast.CompareStmt(name, ticks, scenarios);
+    }
+
+    private Ast.Scenario scenario() {
+        Token label = consume(STRING, "Expect scenario label string.");
+        List<Ast.OverrideSpec> overrides = new ArrayList<>();
+        while (match(WITH)) {
+            overrides.add(overrideClause());
+        }
+        return new Ast.Scenario(label.lexeme, overrides);
+    }
+
+    // Parse one override clause body (the part after 'with'):
+    //   disable Name
+    //   disable A -> B   /   disable A <- B
+    //   Name.attribute = N   (currently only 'supply' supported)
+    private Ast.OverrideSpec overrideClause() {
+        if (match(DISABLE)) {
+            Token first = consume(IDENTIFIER, "Expect node name after 'disable'.");
+            if (match(ARROW)) {
+                Token second = consume(IDENTIFIER, "Expect node name after '->'.");
+                return Ast.OverrideSpec.disableEdge(first, second, true);
+            } else if (match(LARROW)) {
+                Token second = consume(IDENTIFIER, "Expect node name after '<-'.");
+                return Ast.OverrideSpec.disableEdge(first, second, false);
+            }
+            return Ast.OverrideSpec.disableNode(first);
+        }
+        // Otherwise property override: Name.attr = N
+        Token name = consume(IDENTIFIER, "Expect node name or 'disable' in override clause.");
+        consume(DOT, "Expect '.' after node name in property override.");
+        Token attr = consume(IDENTIFIER, "Expect attribute name.");
+        if (!attr.lexeme.equals("supply")) {
+            throw error(attr, "Only 'supply' is supported as a property override (got '" + attr.lexeme + "').");
+        }
+        consume(EQUALS, "Expect '=' after attribute name in override.");
+        boolean negate = match(DASH);
+        double value = consumeNumber("Expect number on right-hand side of override.");
+        if (negate) value = -value;
+        return Ast.OverrideSpec.supply(name, value);
     }
 
     // disable Name;
@@ -371,6 +432,7 @@ class Parser {
                 case NODE:
                 case START:
                 case DISABLE:
+                case COMPARE:
                 case MAP:
                 case LIST:
                 case PRINT:

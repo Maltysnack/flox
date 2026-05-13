@@ -22,6 +22,9 @@ class Scanner {
         keywords.put("mode", TokenType.MODE);
         keywords.put("start", TokenType.START);
         keywords.put("disable", TokenType.DISABLE);
+        keywords.put("compare", TokenType.COMPARE);
+        keywords.put("as", TokenType.AS);
+        keywords.put("with", TokenType.WITH);
     }
 
     private final String source;
@@ -71,6 +74,15 @@ class Scanner {
                 break;
             case ':':
                 addToken(TokenType.COLON);
+                break;
+            case '.':
+                addToken(TokenType.DOT);
+                break;
+            case '=':
+                addToken(TokenType.EQUALS);
+                break;
+            case '"':
+                string();
                 break;
             case '-':
                 if (match('>')) {
@@ -146,6 +158,26 @@ class Scanner {
 
         double value = Double.parseDouble(source.substring(start, current));
         addToken(TokenType.NUMBER, value);
+    }
+
+    private void string() {
+        while (peek() != '"' && !isAtEnd()) {
+            if (peek() == '\n') line++;
+            advance();
+        }
+        if (isAtEnd()) {
+            System.err.println("Unterminated string starting at line " + line);
+            return;
+        }
+        advance(); // consume closing "
+        // Trim the surrounding quotes from the literal value.
+        String value = source.substring(start + 1, current - 1);
+        tokens.add(new Token(TokenType.STRING, source.substring(start, current), null, line));
+        // We re-use the lexeme to carry the string content (with quotes);
+        // callers use a helper to strip them or read source.substring directly.
+        // Simpler approach: store the unquoted value in the lexeme by overwriting.
+        Token t = tokens.remove(tokens.size() - 1);
+        tokens.add(new Token(TokenType.STRING, value, null, t.line));
     }
 
     private void blockComment() {

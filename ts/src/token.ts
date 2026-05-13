@@ -33,6 +33,12 @@ export enum TokenType {
   MODE = "MODE",
   START = "START",
   DISABLE = "DISABLE",
+  COMPARE = "COMPARE",
+  AS = "AS",
+  WITH = "WITH",
+  STRING = "STRING",
+  DOT = "DOT",
+  EQUALS = "EQUALS",
 
   EOF = "EOF",
 }

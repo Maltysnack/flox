@@ -15,6 +15,13 @@ enum TokenType {
     SYSTEM, MAP, LIST, PRINT, HELP,
     RIVER, DAM, OUTLET, NODE,
     MODE, START, DISABLE,
+    COMPARE, AS, WITH,
+
+    // Literals (string for scenario labels)
+    STRING,
+
+    // Operators
+    DOT, EQUALS,
 
     EOF
 }

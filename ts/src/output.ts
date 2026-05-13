@@ -358,6 +358,87 @@ export function printGridMap(o: Output, system: RiverSystem): void {
   o.println("");
 }
 
+export function printGridComparison(
+  o: Output,
+  original: RiverSystem,
+  runs: RiverSystem[],
+  labels: string[],
+): void {
+  o.println("");
+  o.println("=== COMPARE: " + original.name + " ===\n");
+
+  let labelW = "Scenarios".length;
+  for (const l of labels) labelW = Math.max(labelW, l.length);
+  o.println("Scenarios:");
+  for (let i = 0; i < runs.length; i++) {
+    const r = runs[i]!;
+    const status = r.gridConverged ? "converged" : "not yet converged";
+    o.println(
+      "  " + padRight(labels[i]!, labelW) + "  " +
+      r.gridTicksRun + " tick" + (r.gridTicksRun === 1 ? "" : "s") + ", " + status,
+    );
+  }
+  o.println("");
+
+  const colW: number[] = [];
+  for (let i = 0; i < runs.length; i++) {
+    let w = Math.max(8, labels[i]!.length);
+    for (const v of runs[i]!.gridLevel.values()) w = Math.max(w, signedFmt(v).length);
+    for (const v of runs[i]!.gridFlow.values()) w = Math.max(w, signedFmt(v).length);
+    w = Math.max(w, "(off)".length);
+    colW.push(w);
+  }
+
+  let rowLabelW = "Levels:".length;
+  for (const n of original.rivers.keys()) rowLabelW = Math.max(rowLabelW, n.length + 2);
+  for (const n of original.dams.keys()) rowLabelW = Math.max(rowLabelW, n.length + 2);
+  for (const [from, edges] of original.connections) {
+    for (const e of edges) {
+      rowLabelW = Math.max(rowLabelW, (from + " -> " + e.target).length + 2);
+    }
+  }
+
+  o.print(padRight("", rowLabelW));
+  for (let i = 0; i < runs.length; i++) {
+    o.print("  " + padLeft(labels[i]!, colW[i]!));
+  }
+  o.println("");
+
+  o.println("Levels:");
+  for (const node of original.rivers.keys()) {
+    o.print(padRight("  " + node, rowLabelW));
+    for (let i = 0; i < runs.length; i++) {
+      const r = runs[i]!;
+      let cell: string;
+      if (r.disabledNodes.has(node)) cell = "(off)";
+      else if (r.gridLevel.has(node)) cell = signedFmt(r.gridLevel.get(node)!);
+      else cell = "—";
+      o.print("  " + padLeft(cell, colW[i]!));
+    }
+    o.println("");
+  }
+  o.println("");
+
+  o.println("Flows (positive = first-to-second direction):");
+  for (const [from, edges] of original.connections) {
+    for (const e of edges) {
+      const label = "  " + from + " -> " + e.target;
+      o.print(padRight(label, rowLabelW));
+      const key = `${from}->${e.target}`;
+      for (let i = 0; i < runs.length; i++) {
+        const r = runs[i]!;
+        let cell: string;
+        if (r.disabledNodes.has(from) || r.disabledNodes.has(e.target)) cell = "(off)";
+        else if (r.gridFlow.has(key)) cell = signedFmt(r.gridFlow.get(key)!);
+        else cell = "(off)";
+        o.print("  " + padLeft(cell, colW[i]!));
+      }
+      o.println("");
+    }
+  }
+  o.println("");
+}
+
 export function printGridState(o: Output, system: RiverSystem): void {
   const tickWord = system.gridTicksRun === 1 ? "tick" : "ticks";
   const status = system.gridConverged ? ", converged" : ", not yet converged";

@@ -4,8 +4,11 @@ import {
   AstNode,
   Chain,
   ChainEdge,
+  CompareStmt,
   DamDecl,
   DisableStmt,
+  OverrideSpec,
+  Scenario,
   HelpStmt,
   ListStmt,
   MapStmt,
@@ -48,6 +51,7 @@ export class Parser {
       if (this.match(TokenType.NODE))   return this.nodeDeclaration();
       if (this.match(TokenType.START))  return this.startStatement();
       if (this.match(TokenType.DISABLE)) return this.disableStatement();
+      if (this.match(TokenType.COMPARE)) return this.compareStatement();
       if (this.match(TokenType.MAP))    return this.mapStatement();
       if (this.match(TokenType.LIST))   return this.listStatement();
       if (this.match(TokenType.PRINT))  return this.printStatement();
@@ -66,6 +70,51 @@ export class Parser {
     const name = this.consume(TokenType.IDENTIFIER, "Expect mode name (e.g. river, markov).");
     this.consume(TokenType.SEMICOLON, "Expect ';' after mode name.");
     return { kind: "ModeDecl", mode: name };
+  }
+
+  private compareStatement(): CompareStmt {
+    const name = this.consume(TokenType.IDENTIFIER, "Expect system name after 'compare'.");
+    let ticks: number | null = null;
+    if (this.match(TokenType.NUMBER)) {
+      ticks = this.previous().literal as number;
+    }
+    this.consume(TokenType.AS, "Expect 'as' before the scenario list.");
+    const scenarios: Scenario[] = [this.scenario()];
+    while (this.match(TokenType.COMMA)) scenarios.push(this.scenario());
+    this.consume(TokenType.SEMICOLON, "Expect ';' after compare statement.");
+    return { kind: "CompareStmt", systemName: name, ticks, scenarios };
+  }
+
+  private scenario(): Scenario {
+    const label = this.consume(TokenType.STRING, "Expect scenario label string.");
+    const overrides: OverrideSpec[] = [];
+    while (this.match(TokenType.WITH)) overrides.push(this.overrideClause());
+    return { label: label.lexeme, overrides };
+  }
+
+  private overrideClause(): OverrideSpec {
+    if (this.match(TokenType.DISABLE)) {
+      const first = this.consume(TokenType.IDENTIFIER, "Expect node name after 'disable'.");
+      if (this.match(TokenType.ARROW)) {
+        const second = this.consume(TokenType.IDENTIFIER, "Expect node name after '->'.");
+        return { kind: "disable-edge", name1: first, name2: second, forward: true };
+      } else if (this.match(TokenType.LARROW)) {
+        const second = this.consume(TokenType.IDENTIFIER, "Expect node name after '<-'.");
+        return { kind: "disable-edge", name1: first, name2: second, forward: false };
+      }
+      return { kind: "disable-node", name1: first };
+    }
+    const name = this.consume(TokenType.IDENTIFIER, "Expect node name or 'disable' in override clause.");
+    this.consume(TokenType.DOT, "Expect '.' after node name in property override.");
+    const attr = this.consume(TokenType.IDENTIFIER, "Expect attribute name.");
+    if (attr.lexeme !== "supply") {
+      throw this.errorAt(attr, `Only 'supply' is supported as a property override (got '${attr.lexeme}').`);
+    }
+    this.consume(TokenType.EQUALS, "Expect '=' after attribute name in override.");
+    const negate = this.match(TokenType.DASH);
+    let value = this.consumeNumber("Expect number on right-hand side of override.");
+    if (negate) value = -value;
+    return { kind: "supply", name1: name, value };
   }
 
   private disableStatement(): DisableStmt {
@@ -374,6 +423,7 @@ export class Parser {
         case TokenType.NODE:
         case TokenType.START:
         case TokenType.DISABLE:
+        case TokenType.COMPARE:
         case TokenType.MAP:
         case TokenType.LIST:
         case TokenType.PRINT:

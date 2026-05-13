@@ -44,7 +44,8 @@ class RiverSystem {
                 // skipping disabled source nodes entirely. If any element
                 // is disabled we soften this to a warning (the user is
                 // exploring a scenario; an unbalanced chain is OK).
-                boolean softened = !s.disabledNodes.isEmpty()
+                boolean softened = s.scenarioRun
+                        || !s.disabledNodes.isEmpty()
                         || s.connections.values().stream().flatMap(List::stream).anyMatch(e -> !e.enabled);
                 for (Map.Entry<String, List<Edge>> entry : s.connections.entrySet()) {
                     if (s.disabledNodes.contains(entry.getKey())) continue;
@@ -104,7 +105,8 @@ class RiverSystem {
                             "Grid system '" + s.name + "' has no supply set on any active node. "
                                     + "Use 'node X { supply: N }' for generators (+) or loads (-).");
                 }
-                boolean softened = !s.disabledNodes.isEmpty()
+                boolean softened = s.scenarioRun
+                        || !s.disabledNodes.isEmpty()
                         || s.connections.values().stream().flatMap(List::stream).anyMatch(e -> !e.enabled);
                 if (Math.abs(total) > 1e-6) {
                     String msg = "Grid system '" + s.name + "': supplies do not balance (sum = "
@@ -165,6 +167,9 @@ class RiverSystem {
     // but they remain in rivers/dams so the visualisation can render
     // them dimmed.
     Set<String> disabledNodes = new LinkedHashSet<>();
+    // Marker set by `compare` so per-mode validators know they're looking
+    // at a scenario clone and should soften their requirements.
+    boolean scenarioRun = false;
 
     // Markov-mode state.
     Map<String, Double> initialMass = new LinkedHashMap<>();

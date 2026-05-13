@@ -177,6 +177,89 @@ class Interpreter implements Ast.Visitor<Void> {
     }
 
     @Override
+    public Void visitCompareStmt(Ast.CompareStmt stmt) {
+        if (phase != Phase.EXECUTE) return null;
+        RiverSystem original = lookupSystem(stmt.systemName);
+        if (original.mode != RiverSystem.Mode.GRID) {
+            throw new RuntimeException(
+                    "'compare' is only supported in grid mode for now (system '"
+                            + original.name + "' is " + original.mode.name().toLowerCase() + " mode).");
+        }
+        double[] arg = (stmt.ticks != null)
+                ? new double[] { stmt.ticks }
+                : original.mode.defaultArg();
+
+        List<RiverSystem> runs = new ArrayList<>();
+        List<String> labels = new ArrayList<>();
+        for (Ast.Scenario sc : stmt.scenarios) {
+            RiverSystem clone = scenarioClone(original, sc.overrides);
+            clone.mode.validate(clone, errs);
+            clone.identifyRoots();
+            clone.mode.run(clone, arg);
+            runs.add(clone);
+            labels.add(sc.label);
+        }
+        OutputFormatter.printGridComparison(original, runs, labels);
+        return null;
+    }
+
+    // Build a fresh RiverSystem from an existing one with per-scenario
+    // overrides applied. Rivers/dams are recreated (rivers may have an
+    // overridden supply); edges are recreated with possibly-flipped
+    // enabled flags. The original system is not mutated.
+    private RiverSystem scenarioClone(RiverSystem src, List<Ast.OverrideSpec> overrides) {
+        Map<String, Double> supplyOverrides = new HashMap<>();
+        Set<String> extraDisableNodes = new HashSet<>();
+        Set<String> extraDisableEdges = new HashSet<>(); // "from|to"
+        for (Ast.OverrideSpec o : overrides) {
+            switch (o.kind) {
+                case DISABLE_NODE:
+                    extraDisableNodes.add(o.name1.lexeme); break;
+                case DISABLE_EDGE: {
+                    String from = o.forward ? o.name1.lexeme : o.name2.lexeme;
+                    String to   = o.forward ? o.name2.lexeme : o.name1.lexeme;
+                    extraDisableEdges.add(from + "|" + to);
+                    break;
+                }
+                case SUPPLY:
+                    supplyOverrides.put(o.name1.lexeme, o.value); break;
+            }
+        }
+
+        RiverSystem clone = new RiverSystem(src.name);
+        clone.mode = src.mode;
+        clone.scenarioRun = true;
+
+        for (River r : src.rivers.values()) {
+            double supply = supplyOverrides.getOrDefault(r.name, r.supply);
+            clone.addRiver(new River(r.name, r.baseFlow, r.peakMultiplier, r.decayRate, supply));
+        }
+        for (Dam d : src.dams.values()) clone.addDam(d);
+
+        // Combined disabled-nodes set: those in the base system + extras.
+        clone.disabledNodes.addAll(src.disabledNodes);
+        clone.disabledNodes.addAll(extraDisableNodes);
+
+        for (Map.Entry<String, List<RiverSystem.Edge>> entry : src.connections.entrySet()) {
+            String from = entry.getKey();
+            for (RiverSystem.Edge e : entry.getValue()) {
+                clone.addConnection(from, e.target, e.weight, e.op);
+                List<RiverSystem.Edge> outs = clone.connections.get(from);
+                RiverSystem.Edge added = outs.get(outs.size() - 1);
+                added.enabled = e.enabled;  // carry forward base disables
+                if (extraDisableEdges.contains(from + "|" + e.target)) added.enabled = false;
+                if (clone.disabledNodes.contains(from) || clone.disabledNodes.contains(e.target)) {
+                    added.enabled = false;
+                }
+            }
+        }
+
+        // Carry forward markov initial-mass.
+        clone.initialMass.putAll(src.initialMass);
+        return clone;
+    }
+
+    @Override
     public Void visitDisableStmt(Ast.DisableStmt stmt) {
         if (phase != Phase.COLLECT) return null;
         requireSystem(stmt.first);

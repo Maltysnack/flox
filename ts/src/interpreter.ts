@@ -1,8 +1,8 @@
 // Two-pass interpreter. Mechanical port of Interpreter.java.
 
-import { AstNode, Chain, DisableStmt } from "./ast.ts";
+import { AstNode, Chain, CompareStmt, DisableStmt, OverrideSpec } from "./ast.ts";
 import { STRATEGIES } from "./modes.ts";
-import { Output, printHelp, printList } from "./output.ts";
+import { Output, printGridComparison, printHelp, printList } from "./output.ts";
 import { Dam, Mode, River, RiverSystem } from "./runtime.ts";
 import { Token } from "./token.ts";
 
@@ -213,6 +213,29 @@ export class Interpreter {
         return;
       }
 
+      case "CompareStmt": {
+        if (this.phase !== Phase.EXECUTE) return;
+        const original = this.lookupSystem(stmt.systemName);
+        if (original.mode !== "grid") {
+          throw new Error(
+            `'compare' is only supported in grid mode for now (system '${original.name}' is ${original.mode} mode).`,
+          );
+        }
+        const arg = stmt.ticks != null ? [stmt.ticks] : STRATEGIES[original.mode].defaultArg();
+        const runs: RiverSystem[] = [];
+        const labels: string[] = [];
+        for (const sc of stmt.scenarios) {
+          const clone = this.scenarioClone(original, sc.overrides);
+          STRATEGIES[clone.mode].validate(clone, this.errs);
+          clone.identifyRoots();
+          STRATEGIES[clone.mode].run(clone, arg);
+          runs.push(clone);
+          labels.push(sc.label);
+        }
+        printGridComparison(new Output(this.out), original, runs, labels);
+        return;
+      }
+
       case "HelpStmt": {
         if (this.phase !== Phase.EXECUTE) return;
         printHelp(new Output(this.out));
@@ -243,6 +266,51 @@ export class Interpreter {
         }
       }
     }
+  }
+
+  private scenarioClone(src: RiverSystem, overrides: OverrideSpec[]): RiverSystem {
+    const supplyOverrides = new Map<string, number>();
+    const extraDisableNodes = new Set<string>();
+    const extraDisableEdges = new Set<string>();
+    for (const o of overrides) {
+      if (o.kind === "disable-node") extraDisableNodes.add(o.name1.lexeme);
+      else if (o.kind === "disable-edge") {
+        const from = o.forward ? o.name1.lexeme : o.name2.lexeme;
+        const to = o.forward ? o.name2.lexeme : o.name1.lexeme;
+        extraDisableEdges.add(`${from}|${to}`);
+      } else if (o.kind === "supply") {
+        supplyOverrides.set(o.name1.lexeme, o.value);
+      }
+    }
+
+    const clone = new RiverSystem(src.name);
+    clone.mode = src.mode;
+    clone.scenarioRun = true;
+
+    for (const r of src.rivers.values()) {
+      const supply = supplyOverrides.get(r.name) ?? r.supply;
+      clone.addRiver(new River(r.name, r.baseFlow, r.peakMultiplier, r.decayRate, supply));
+    }
+    for (const d of src.dams.values()) clone.addDam(d);
+
+    for (const n of src.disabledNodes) clone.disabledNodes.add(n);
+    for (const n of extraDisableNodes) clone.disabledNodes.add(n);
+
+    for (const [from, edges] of src.connections) {
+      for (const e of edges) {
+        clone.addConnection(from, e.target, e.weight, e.op);
+        const outs = clone.connections.get(from)!;
+        const added = outs[outs.length - 1]!;
+        added.enabled = e.enabled;
+        if (extraDisableEdges.has(`${from}|${e.target}`)) added.enabled = false;
+        if (clone.disabledNodes.has(from) || clone.disabledNodes.has(e.target)) {
+          added.enabled = false;
+        }
+      }
+    }
+
+    for (const [k, v] of src.initialMass) clone.initialMass.set(k, v);
+    return clone;
   }
 
   private applyDisables(): void {

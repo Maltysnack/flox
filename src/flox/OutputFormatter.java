@@ -367,6 +367,97 @@ class OutputFormatter {
     }
 
     /* ─────────────────────────────── */
+    /* GRID COMPARE (side-by-side scenarios) */
+    /* ─────────────────────────────── */
+    static void printGridComparison(RiverSystem original, List<RiverSystem> runs, List<String> labels) {
+        System.out.println("\n=== COMPARE: " + original.name + " ===\n");
+
+        // Per-scenario header line.
+        int labelW = "Scenarios".length();
+        for (String l : labels) labelW = Math.max(labelW, l.length());
+        System.out.println("Scenarios:");
+        for (int i = 0; i < runs.size(); i++) {
+            RiverSystem r = runs.get(i);
+            String status = r.gridConverged ? "converged" : "not yet converged";
+            System.out.println("  " + padRight(labels.get(i), labelW) + "  "
+                    + r.gridTicksRun + " tick" + (r.gridTicksRun == 1 ? "" : "s")
+                    + ", " + status);
+        }
+        System.out.println();
+
+        // Determine per-column width. Width = max of label and max value width.
+        int[] colW = new int[runs.size()];
+        for (int i = 0; i < runs.size(); i++) {
+            colW[i] = Math.max(8, labels.get(i).length());
+            for (double v : runs.get(i).gridLevel.values()) {
+                colW[i] = Math.max(colW[i], signedFmt(v).length());
+            }
+            for (double v : runs.get(i).gridFlow.values()) {
+                colW[i] = Math.max(colW[i], signedFmt(v).length());
+            }
+            colW[i] = Math.max(colW[i], "(off)".length());
+        }
+
+        // Row labels.
+        int rowLabelW = "Levels:".length();
+        for (String n : original.rivers.keySet()) rowLabelW = Math.max(rowLabelW, n.length() + 2);
+        for (String n : original.dams.keySet()) rowLabelW = Math.max(rowLabelW, n.length() + 2);
+        for (Map.Entry<String, List<RiverSystem.Edge>> e : original.connections.entrySet()) {
+            for (RiverSystem.Edge ed : e.getValue()) {
+                rowLabelW = Math.max(rowLabelW, (e.getKey() + " -> " + ed.target).length() + 2);
+            }
+        }
+
+        // Column header.
+        System.out.print(padRight("", rowLabelW));
+        for (int i = 0; i < runs.size(); i++) {
+            System.out.print("  " + padLeft(labels.get(i), colW[i]));
+        }
+        System.out.println();
+
+        // Levels.
+        System.out.println("Levels:");
+        for (String node : original.rivers.keySet()) {
+            System.out.print(padRight("  " + node, rowLabelW));
+            for (int i = 0; i < runs.size(); i++) {
+                RiverSystem r = runs.get(i);
+                String cell;
+                if (r.disabledNodes.contains(node)) cell = "(off)";
+                else if (r.gridLevel.containsKey(node)) cell = signedFmt(r.gridLevel.get(node));
+                else cell = "—";
+                System.out.print("  " + padLeft(cell, colW[i]));
+            }
+            System.out.println();
+        }
+        System.out.println();
+
+        // Flows.
+        System.out.println("Flows (positive = first-to-second direction):");
+        for (Map.Entry<String, List<RiverSystem.Edge>> entry : original.connections.entrySet()) {
+            String from = entry.getKey();
+            for (RiverSystem.Edge edge : entry.getValue()) {
+                String label = "  " + from + " -> " + edge.target;
+                System.out.print(padRight(label, rowLabelW));
+                String key = from + "->" + edge.target;
+                for (int i = 0; i < runs.size(); i++) {
+                    RiverSystem r = runs.get(i);
+                    String cell;
+                    if (r.disabledNodes.contains(from) || r.disabledNodes.contains(edge.target)) {
+                        cell = "(off)";
+                    } else if (r.gridFlow.containsKey(key)) {
+                        cell = signedFmt(r.gridFlow.get(key));
+                    } else {
+                        cell = "(off)"; // edge disabled in this scenario
+                    }
+                    System.out.print("  " + padLeft(cell, colW[i]));
+                }
+                System.out.println();
+            }
+        }
+        System.out.println();
+    }
+
+    /* ─────────────────────────────── */
     /* GRID STATE */
     /* ─────────────────────────────── */
     static void printGridState(RiverSystem system) {

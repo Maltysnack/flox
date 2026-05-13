@@ -15,6 +15,7 @@ export type AstNode =
   | Chain
   | StartStmt
   | DisableStmt
+  | CompareStmt
   | MapStmt
   | ListStmt
   | PrintStmt
@@ -82,6 +83,23 @@ export interface DisableStmt {
   readonly first: Token;
   readonly second: Token | null;  // null = node disable
   readonly forward: boolean;      // ignored if second is null
+}
+
+export type OverrideSpec =
+  | { kind: "disable-node"; name1: Token }
+  | { kind: "disable-edge"; name1: Token; name2: Token; forward: boolean }
+  | { kind: "supply"; name1: Token; value: number };
+
+export interface Scenario {
+  readonly label: string;
+  readonly overrides: OverrideSpec[];
+}
+
+export interface CompareStmt {
+  readonly kind: "CompareStmt";
+  readonly systemName: Token;
+  readonly ticks: number | null;
+  readonly scenarios: Scenario[];
 }
 
 export interface MapStmt {

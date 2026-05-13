@@ -15,6 +15,9 @@ const KEYWORDS: Record<string, TokenType> = {
   mode: TokenType.MODE,
   start: TokenType.START,
   disable: TokenType.DISABLE,
+  compare: TokenType.COMPARE,
+  as: TokenType.AS,
+  with: TokenType.WITH,
 };
 
 export class Scanner {
@@ -48,6 +51,9 @@ export class Scanner {
       case ";": this.addToken(TokenType.SEMICOLON); break;
       case "%": this.addToken(TokenType.PERCENT); break;
       case ":": this.addToken(TokenType.COLON); break;
+      case ".": this.addToken(TokenType.DOT); break;
+      case "=": this.addToken(TokenType.EQUALS); break;
+      case '"': this.string(); break;
       case "-":
         if (this.match(">")) {
           this.addToken(TokenType.ARROW);
@@ -93,6 +99,21 @@ export class Scanner {
         }
         break;
     }
+  }
+
+  private string(): void {
+    while (this.peek() !== '"' && !this.isAtEnd()) {
+      if (this.peek() === "\n") this.line++;
+      this.advance();
+    }
+    if (this.isAtEnd()) {
+      this.errs.push(`Unterminated string starting at line ${this.line}\n`);
+      return;
+    }
+    this.advance(); // consume closing "
+    const value = this.source.slice(this.start + 1, this.current - 1);
+    // Store the unquoted content in the token lexeme.
+    this.tokens.push(new Token(TokenType.STRING, value, null, this.line));
   }
 
   private blockComment(): void {

@@ -101,6 +101,9 @@ export class RiverSystem {
   // Nodes explicitly disabled via 'disable' statements. Skipped by every
   // simulator; remain in rivers/dams so the visualisation can dim them.
   disabledNodes: Set<string> = new Set();
+  // Marker set by `compare` so per-mode validators know to soften their
+  // requirements (the run is exploring a scenario, not the canonical one).
+  scenarioRun = false;
 
   // Markov state
   initialMass: Map<string, number> = new Map();
