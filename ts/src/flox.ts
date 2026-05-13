@@ -38,11 +38,25 @@ export interface GraphEdge {
   disabled: boolean;
 }
 
+export type GraphOverride =
+  | { kind: "disable-node"; name: string }
+  | { kind: "disable-edge"; from: string; to: string }
+  | { kind: "supply"; name: string; value: number };
+
+export interface GraphScenario {
+  label: string;
+  overrides: GraphOverride[];
+}
+
 export interface SystemGraph {
   name: string;
   mode: Mode;
   nodes: GraphNode[];
   edges: GraphEdge[];
+  // Populated when the source contains `compare` statements for this
+  // system. The renderer uses this to draw N small graphs instead of
+  // one big one.
+  scenarios?: GraphScenario[];
 }
 
 export interface ParseGraphResult {
@@ -102,9 +116,38 @@ export function parseGraph(source: string): ParseGraphResult {
     errs.push("Runtime error: " + msg + "\n");
   }
 
+  // Walk the AST once to collect compare scenarios per system. Compare
+  // is an EXECUTE-phase statement so collectAndResolve hasn't visited
+  // it yet; we just pull the data out of the parsed AST directly.
+  const scenariosBySystem = new Map<string, GraphScenario[]>();
+  for (const stmt of ast) {
+    if (stmt && stmt.kind === "CompareStmt") {
+      const sysName = stmt.systemName.lexeme;
+      const sceneList = scenariosBySystem.get(sysName) ?? [];
+      for (const sc of stmt.scenarios) {
+        sceneList.push({
+          label: sc.label,
+          overrides: sc.overrides.map(o => {
+            if (o.kind === "disable-node") return { kind: "disable-node", name: o.name1.lexeme };
+            if (o.kind === "disable-edge") {
+              const from = o.forward ? o.name1.lexeme : o.name2.lexeme;
+              const to   = o.forward ? o.name2.lexeme : o.name1.lexeme;
+              return { kind: "disable-edge", from, to };
+            }
+            return { kind: "supply", name: o.name1.lexeme, value: o.value };
+          }),
+        });
+      }
+      scenariosBySystem.set(sysName, sceneList);
+    }
+  }
+
   const systems: SystemGraph[] = [];
   for (const sys of interp.getSystems().values()) {
-    systems.push(systemToGraph(sys));
+    const graph = systemToGraph(sys);
+    const scenarios = scenariosBySystem.get(sys.name);
+    if (scenarios && scenarios.length > 0) graph.scenarios = scenarios;
+    systems.push(graph);
   }
 
   return { systems, hadError: errs.length > 0, stderr: errs.join("") };
