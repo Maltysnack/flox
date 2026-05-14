@@ -29,6 +29,11 @@ export interface GraphNode {
   kind: NodeKind;
   supply: number;
   disabled: boolean;
+  // River-mode only: per-day flow series captured from the simulator
+  // (10 entries by default). Populated by parseGraph so the playground
+  // can draw a hydrograph alongside the topology. Undefined for
+  // non-river modes or when the simulation could not be run.
+  series?: number[];
 }
 
 export interface GraphEdge {
@@ -187,6 +192,21 @@ export function parseGraph(source: string): ParseGraphResult {
     scenariosBySystem.set(sysName, sceneList);
   }
 
+  // For river-mode systems, run the simulator once with a default 1mm
+  // pulse so the renderer can show a hydrograph (per-day flow per node).
+  // Wrapped in try/catch: a malformed program shouldn't block the
+  // topology view.
+  for (const sys of interp.getSystems().values()) {
+    if (sys.mode !== "river") continue;
+    try {
+      const strat = STRATEGIES["river"];
+      sys.identifyRoots();
+      strat.run(sys, strat.defaultArg());
+    } catch (_e) {
+      // leave series unset; renderer falls back to topology only
+    }
+  }
+
   const systems: SystemGraph[] = [];
   for (const sys of interp.getSystems().values()) {
     const graph = systemToGraph(sys);
@@ -200,21 +220,30 @@ export function parseGraph(source: string): ParseGraphResult {
 
 function systemToGraph(sys: RiverSystem): SystemGraph {
   const nodes: GraphNode[] = [];
+  const isRiver = sys.mode === "river";
   for (const r of sys.rivers.values()) {
-    nodes.push({
+    const node: GraphNode = {
       name: r.name,
       kind: classifyRiver(r, sys.mode),
       supply: r.supply,
       disabled: sys.disabledNodes.has(r.name),
-    });
+    };
+    if (isRiver && r.dailyFlow && r.dailyFlow.length > 0) {
+      node.series = r.dailyFlow.slice();
+    }
+    nodes.push(node);
   }
   for (const d of sys.dams.values()) {
-    nodes.push({
+    const node: GraphNode = {
       name: d.name,
       kind: "dam",
       supply: 0,
       disabled: sys.disabledNodes.has(d.name),
-    });
+    };
+    if (isRiver && d.dailyOutflow && d.dailyOutflow.length > 0) {
+      node.series = d.dailyOutflow.slice();
+    }
+    nodes.push(node);
   }
 
   const directed = sys.mode !== "grid";
