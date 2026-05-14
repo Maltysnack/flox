@@ -25,6 +25,7 @@ class Scanner {
         keywords.put("compare", TokenType.COMPARE);
         keywords.put("as", TokenType.AS);
         keywords.put("with", TokenType.WITH);
+        keywords.put("units", TokenType.UNITS);
     }
 
     private final String source;

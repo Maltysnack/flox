@@ -30,6 +30,7 @@ class Parser {
     private Ast declaration() {
         try {
             if (match(MODE))     return modeDeclaration();
+            if (match(UNITS))    return unitsDeclaration();
             if (match(SYSTEM))   return systemDeclaration();
             if (match(RIVER))    return riverDeclaration();
             if (match(DAM))      return damDeclaration();
@@ -98,6 +99,22 @@ class Parser {
     private Ast helpStatement() {
         consume(SEMICOLON, "Expect ';' after 'help'.");
         return new Ast.HelpStmt();
+    }
+
+    // units { key: "label" [, key: "label" ...] }
+    private Ast unitsDeclaration() {
+        consume(LEFT_BRACE, "Expect '{' after 'units'.");
+        Map<String, String> labels = new HashMap<>();
+        while (!check(RIGHT_BRACE) && !isAtEnd()) {
+            Token key = consume(IDENTIFIER, "Expect units key (e.g. supply, level, flow).");
+            consume(COLON, "Expect ':' after units key '" + key.lexeme + "'.");
+            Token value = consume(STRING, "Expect string value for units key '" + key.lexeme + "'.");
+            labels.put(key.lexeme, value.lexeme);
+            match(COMMA);
+        }
+        consume(RIGHT_BRACE, "Expect '}' to close units block.");
+        consumeOptional(SEMICOLON);
+        return new Ast.UnitsDecl(labels);
     }
 
     // mode river;   or   mode markov;
@@ -433,6 +450,7 @@ class Parser {
                 case START:
                 case DISABLE:
                 case COMPARE:
+                case UNITS:
                 case MAP:
                 case LIST:
                 case PRINT:

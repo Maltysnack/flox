@@ -18,6 +18,7 @@ export class Interpreter {
   private currentSystem: RiverSystem | null = null;
   private phase: Phase = Phase.COLLECT;
   private fileMode: Mode = "river";
+  private readonly fileUnits = new Map<string, string>();
 
   constructor(
     private readonly out: string[],
@@ -44,7 +45,10 @@ export class Interpreter {
     for (const stmt of statements) {
       if (stmt) this.execute(stmt);
     }
-    for (const s of this.systems.values()) s.mode = this.fileMode;
+    for (const s of this.systems.values()) {
+      s.mode = this.fileMode;
+      for (const [k, v] of this.fileUnits) s.unitLabels.set(k, v);
+    }
     this.resolveChains();
     this.applyDisables();
     for (const s of this.systems.values()) STRATEGIES[s.mode].validate(s, this.errs);
@@ -175,6 +179,14 @@ export class Interpreter {
         if (this.phase !== Phase.COLLECT) return;
         const sys = this.requireSystem(stmt.first);
         this.pendingDisables.get(sys.name)!.push(stmt);
+        return;
+      }
+
+      case "UnitsDecl": {
+        if (this.phase !== Phase.COLLECT) return;
+        for (const [k, v] of Object.entries(stmt.labels)) {
+          this.fileUnits.set(k, v);
+        }
         return;
       }
 

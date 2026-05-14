@@ -6,6 +6,7 @@ import {
   ChainEdge,
   CompareStmt,
   DamDecl,
+  UnitsDecl,
   DisableStmt,
   OverrideSpec,
   Scenario,
@@ -44,6 +45,7 @@ export class Parser {
   private declaration(): AstNode | null {
     try {
       if (this.match(TokenType.MODE))   return this.modeDeclaration();
+      if (this.match(TokenType.UNITS))  return this.unitsDeclaration();
       if (this.match(TokenType.SYSTEM)) return this.systemDeclaration();
       if (this.match(TokenType.RIVER))  return this.riverDeclaration();
       if (this.match(TokenType.DAM))    return this.damDeclaration();
@@ -64,6 +66,21 @@ export class Parser {
       }
       throw e;
     }
+  }
+
+  private unitsDeclaration(): UnitsDecl {
+    this.consume(TokenType.LEFT_BRACE, "Expect '{' after 'units'.");
+    const labels: Record<string, string> = {};
+    while (!this.check(TokenType.RIGHT_BRACE) && !this.isAtEnd()) {
+      const key = this.consume(TokenType.IDENTIFIER, "Expect units key.");
+      this.consume(TokenType.COLON, `Expect ':' after units key '${key.lexeme}'.`);
+      const value = this.consume(TokenType.STRING, `Expect string value for units key '${key.lexeme}'.`);
+      labels[key.lexeme] = value.lexeme;
+      this.match(TokenType.COMMA);
+    }
+    this.consume(TokenType.RIGHT_BRACE, "Expect '}' to close units block.");
+    this.consumeOptional(TokenType.SEMICOLON);
+    return { kind: "UnitsDecl", labels };
   }
 
   private modeDeclaration(): ModeDecl {
@@ -424,6 +441,7 @@ export class Parser {
         case TokenType.START:
         case TokenType.DISABLE:
         case TokenType.COMPARE:
+        case TokenType.UNITS:
         case TokenType.MAP:
         case TokenType.LIST:
         case TokenType.PRINT:

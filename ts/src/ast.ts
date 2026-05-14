@@ -16,6 +16,7 @@ export type AstNode =
   | StartStmt
   | DisableStmt
   | CompareStmt
+  | UnitsDecl
   | MapStmt
   | ListStmt
   | PrintStmt
@@ -93,6 +94,11 @@ export type OverrideSpec =
 export interface Scenario {
   readonly label: string;
   readonly overrides: OverrideSpec[];
+}
+
+export interface UnitsDecl {
+  readonly kind: "UnitsDecl";
+  readonly labels: Record<string, string>;
 }
 
 export interface CompareStmt {

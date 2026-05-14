@@ -104,7 +104,8 @@ class OutputFormatter {
     /* ─────────────────────────────── */
     static void printFlowTable(RiverSystem system, double[] rainfall) {
         System.out.println("\n=== FLOW SIMULATION: " + system.name + " (" + formatRainfall(rainfall) + ") ===\n");
-        System.out.println("(Flow values represent water volume per day in L/s)\n");
+        String flowLabel = system.unitLabels.getOrDefault("flow", "water volume per day in L/s");
+        System.out.println("(Flow values represent " + flowLabel + ")\n");
 
         String finalOutlet = system.getFinalOutlet();
 
@@ -470,16 +471,18 @@ class OutputFormatter {
         int nameWidth = 5;
         for (String n : system.gridLevel.keySet()) nameWidth = Math.max(nameWidth, n.length());
 
-        // Levels section
-        System.out.println("Levels:");
+        String levelTag = system.unitLabels.containsKey("level")
+                ? " (" + system.unitLabels.get("level") + ")" : "";
+        String flowTag = system.unitLabels.containsKey("flow")
+                ? ", " + system.unitLabels.get("flow") : "";
+        System.out.println("Levels" + levelTag + ":");
         for (Map.Entry<String, Double> entry : system.gridLevel.entrySet()) {
             System.out.println("  " + padRight(entry.getKey(), nameWidth) + "  "
                     + signedFmt(entry.getValue()));
         }
         System.out.println();
 
-        // Flows section (positive = first-to-second direction)
-        System.out.println("Flows (positive = first-to-second direction):");
+        System.out.println("Flows (positive = first-to-second direction" + flowTag + "):");
         for (Map.Entry<String, Double> entry : system.gridFlow.entrySet()) {
             String[] parts = entry.getKey().split("->");
             String label = padRight(parts[0], nameWidth) + " -> " + padRight(parts[1], nameWidth);

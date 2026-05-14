@@ -36,6 +36,7 @@ export enum TokenType {
   COMPARE = "COMPARE",
   AS = "AS",
   WITH = "WITH",
+  UNITS = "UNITS",
   STRING = "STRING",
   DOT = "DOT",
   EQUALS = "EQUALS",

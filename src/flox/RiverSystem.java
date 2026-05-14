@@ -170,6 +170,8 @@ class RiverSystem {
     // Marker set by `compare` so per-mode validators know they're looking
     // at a scenario clone and should soften their requirements.
     boolean scenarioRun = false;
+    // Optional cosmetic labels for output (e.g. supply: "cars/min").
+    Map<String, String> unitLabels = new LinkedHashMap<>();
 
     // Markov-mode state.
     Map<String, Double> initialMass = new LinkedHashMap<>();

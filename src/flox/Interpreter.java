@@ -17,6 +17,7 @@ class Interpreter implements Ast.Visitor<Void> {
     // File-level mode. Set by `mode <name>;`. Applied to every system at
     // the end of phase 1. Default is RIVER.
     private RiverSystem.Mode fileMode = RiverSystem.Mode.RIVER;
+    private final Map<String, String> fileUnits = new LinkedHashMap<>();
 
     // Stderr buffer. Validators and the top-level catch push lines here;
     // we flush at the end of interpret() so the byte ordering matches
@@ -37,8 +38,11 @@ class Interpreter implements Ast.Visitor<Void> {
                 if (stmt != null) execute(stmt);
             }
 
-            // Apply file mode to every system before resolution.
-            for (RiverSystem s : systems.values()) s.mode = fileMode;
+            // Apply file mode + units to every system before resolution.
+            for (RiverSystem s : systems.values()) {
+                s.mode = fileMode;
+                s.unitLabels.putAll(fileUnits);
+            }
 
             // Resolve: wire up pending chains against each system's symbol table.
             resolveChains();
@@ -264,6 +268,13 @@ class Interpreter implements Ast.Visitor<Void> {
         if (phase != Phase.COLLECT) return null;
         requireSystem(stmt.first);
         pendingDisables.get(currentSystem.name).add(stmt);
+        return null;
+    }
+
+    @Override
+    public Void visitUnitsDecl(Ast.UnitsDecl stmt) {
+        if (phase != Phase.COLLECT) return null;
+        fileUnits.putAll(stmt.labels);
         return null;
     }
 

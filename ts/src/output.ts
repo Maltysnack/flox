@@ -108,7 +108,8 @@ export function printFlowTable(
       formatRainfall(rainfall) +
       ") ===\n",
   );
-  o.println("(Flow values represent water volume per day in L/s)\n");
+  const flowLabel = system.unitLabels.get("flow") ?? "water volume per day in L/s";
+  o.println("(Flow values represent " + flowLabel + ")\n");
 
   const finalOutlet = system.getFinalOutlet();
 
@@ -453,13 +454,17 @@ export function printGridState(o: Output, system: RiverSystem): void {
     if (n.length > nameWidth) nameWidth = n.length;
   }
 
-  o.println("Levels:");
+  const levelTag = system.unitLabels.has("level")
+    ? " (" + system.unitLabels.get("level") + ")" : "";
+  const flowTag = system.unitLabels.has("flow")
+    ? ", " + system.unitLabels.get("flow") : "";
+  o.println("Levels" + levelTag + ":");
   for (const [name, lvl] of system.gridLevel) {
     o.println("  " + padRight(name, nameWidth) + "  " + signedFmt(lvl));
   }
   o.println("");
 
-  o.println("Flows (positive = first-to-second direction):");
+  o.println("Flows (positive = first-to-second direction" + flowTag + "):");
   for (const [key, flow] of system.gridFlow) {
     const parts = key.split("->");
     const label = padRight(parts[0]!, nameWidth) + " -> " + padRight(parts[1]!, nameWidth);

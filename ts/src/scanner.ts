@@ -18,6 +18,7 @@ const KEYWORDS: Record<string, TokenType> = {
   compare: TokenType.COMPARE,
   as: TokenType.AS,
   with: TokenType.WITH,
+  units: TokenType.UNITS,
 };
 
 export class Scanner {

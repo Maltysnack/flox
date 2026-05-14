@@ -25,6 +25,8 @@ abstract class Ast {
 
         R visitCompareStmt(CompareStmt stmt);
 
+        R visitUnitsDecl(UnitsDecl stmt);
+
         R visitMapStmt(MapStmt stmt);
 
         R visitListStmt(ListStmt stmt);
@@ -156,6 +158,19 @@ abstract class Ast {
             this.forward = forward;
             this.weight = weight;
             this.op = op;
+        }
+    }
+
+    // units { supply: "cars/min", level: "queue size" }
+    // File-level cosmetic labels. The simulator ignores these; the
+    // output formatter uses them to qualify column headers.
+    public static class UnitsDecl extends Ast {
+        public final java.util.Map<String, String> labels;
+        public UnitsDecl(java.util.Map<String, String> labels) { this.labels = labels; }
+
+        @Override
+        public <R> R accept(Visitor<R> visitor) {
+            return visitor.visitUnitsDecl(this);
         }
     }
 
