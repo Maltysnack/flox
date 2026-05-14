@@ -26,8 +26,8 @@ river LowerBrisbaneR  { base: 5,   peak: 1.5, decay: 0.8 }    // tidal, slow
 // Somerset and Wivenhoe. Wivenhoe in real life has separate water-supply
 // and flood-mitigation rules; here it's modelled as one rate switch
 // that opens hard once storage passes its full-supply level.
-dam SomersetDam { capacity: 380,  threshold: 90%,  normalRate: 0.7, openRate: 1.5 }
-dam WivenhoeDam { capacity: 1165, threshold: 100%, normalRate: 0.4, openRate: 2.0 }
+dam SomersetDam { capacity: 380,  threshold: 90%,  normalRate: 2, openRate: 15 }
+dam WivenhoeDam { capacity: 1165, threshold: 100%, normalRate: 3, openRate: 30 }
 
 outlet MoretonBay;
 

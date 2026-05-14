@@ -104,8 +104,8 @@ Parallel edges between the same pair of nodes sum their conductances.
 | ------------- | -------- | ------- |
 | `capacity`    | yes      | Maximum storage in megalitres. |
 | `threshold`   | yes      | Storage level at which the dam opens. `80%` or `0.8`. |
-| `normalRate`  | yes      | Outflow as a fraction of inflow when below threshold. |
-| `openRate`    | yes      | Outflow as a fraction of inflow when at or above threshold. |
+| `normalRate`  | yes      | Outflow in ML/day when storage is below threshold. |
+| `openRate`    | yes      | Outflow in ML/day when storage is at or above threshold. |
 
 ### Outlet
 
@@ -138,10 +138,12 @@ far. A series shorter than ten days is padded with zeros.
 
 ### Dam outflow
 
-If storage is below threshold, outflow = `inflow * normalRate`. At or
-above threshold, outflow = `inflow * openRate`. Storage updates each
-day by `inflow - outflow` with units converted at the boundary
-(L/s to ML/day).
+Outflow is a fixed daily volume independent of inflow. If storage is
+below threshold the dam releases `normalRate` ML/day; at or above
+threshold it releases `openRate` ML/day. Storage updates each day by
+`inflow - outflow` with units converted at the boundary (L/s to
+ML/day). Pick `normalRate < typical inflow < openRate` to make the
+threshold meaningful: the dam fills below threshold and drains above.
 
 ### Edge weights
 

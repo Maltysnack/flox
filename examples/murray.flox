@@ -13,8 +13,8 @@ river Darling                { base: 6, peak: 3.5, decay: 0.7 }
 river Murray                 { base: 8, peak: 2.5 }
 river LowerMurray            { base: 4, peak: 1.5 }
 
-dam HumeDam       { capacity: 4500000, threshold: 75%, normalRate: 0.85, openRate: 1.3 }
-dam BurrinjuckDam { capacity: 1026000, threshold: 70%, normalRate: 0.8,  openRate: 1.2 }
+dam HumeDam       { capacity: 4500000, threshold: 75%, normalRate: 50, openRate: 500 }
+dam BurrinjuckDam { capacity: 1026000, threshold: 70%, normalRate: 30, openRate: 300 }
 
 outlet MurrayMouth;
 

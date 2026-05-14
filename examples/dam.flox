@@ -4,7 +4,7 @@ system Test;
 test -> testDam -> testAgain;
 
 river  test     { base: 2, peak: 2.0, decay: 0.7 }
-dam    testDam  { capacity: 1000, threshold: 80%, normalRate: 0.8, openRate: 1.2 }
+dam    testDam  { capacity: 1000, threshold: 80%, normalRate: 0.2, openRate: 2 }
 outlet testAgain;
 
 
@@ -13,7 +13,7 @@ system Trial;
 trial -> trialDam -> trialAgain;
 
 river  trial      { base: 2, peak: 2.0, decay: 0.7 }
-dam    trialDam   { capacity: 1000, threshold: 40%, normalRate: 0.8, openRate: 1.2 }
+dam    trialDam   { capacity: 1000, threshold: 40%, normalRate: 0.2, openRate: 2 }
 outlet trialAgain;
 
 

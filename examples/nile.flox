@@ -31,7 +31,7 @@ river LowerNile { base: 20, peak: 1.8, decay: 0.8 }
 
 // Aswan reservoir (Lake Nasser). Capacity is stylized; threshold and
 // rates are tuned to make the dam visibly engage during a storm.
-dam AswanHighDam { capacity: 30000, threshold: 70%, normalRate: 0.85, openRate: 1.4 }
+dam AswanHighDam { capacity: 30000, threshold: 70%, normalRate: 2, openRate: 20 }
 
 outlet Mediterranean;
 

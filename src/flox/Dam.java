@@ -8,8 +8,8 @@ class Dam {
     final String name;
     final double capacity;    // ML
     final double threshold;   // fraction, 0.8 = 80%
-    final double normalRate;  // fraction of inflow passed through below threshold
-    final double openRate;    // fraction of inflow passed through above threshold
+    final double normalRate;  // absolute outflow in ML/day, below threshold
+    final double openRate;    // absolute outflow in ML/day, at or above threshold
     double currentLevel;      // ML
     double[] dailyOutflow;    // L/s, one entry per simulation day
 
@@ -24,33 +24,24 @@ class Dam {
     }
 
     // Process one day of inflow and return that day's outflow.
-    // inflow and outflow are L/s; storage is ML. Conversion is applied
-    // when mutating storage so the threshold is meaningful.
+    // Outflow is a fixed daily volume (normalRate below threshold,
+    // openRate at or above), independent of inflow. A real reservoir
+    // releases according to an operational schedule, not as a fraction
+    // of what happens to flow in.
+    //
+    // inflow and outflow are returned in L/s; storage is in ML.
     double processFlow(double inflowLps) {
-        // Convert today's inflow into a daily volume and add to storage.
         double inflowVolumeMl = inflowLps * L_PER_S_TO_ML_PER_DAY;
         currentLevel += inflowVolumeMl;
 
-        // Decide outflow rate based on current storage vs threshold.
-        double outflowLps;
-        if (currentLevel >= capacity * threshold) {
-            outflowLps = inflowLps * openRate;
-        } else {
-            outflowLps = inflowLps * normalRate;
-        }
+        double outflowVolumeMl = (currentLevel >= capacity * threshold)
+                ? openRate : normalRate;
+        if (outflowVolumeMl > currentLevel) outflowVolumeMl = currentLevel;
 
-        // Cap outflow to what's actually in storage.
-        double outflowVolumeMl = outflowLps * L_PER_S_TO_ML_PER_DAY;
-        if (outflowVolumeMl > currentLevel) {
-            outflowVolumeMl = currentLevel;
-            outflowLps = outflowVolumeMl / L_PER_S_TO_ML_PER_DAY;
-        }
-
-        // Subtract outflow from storage; cap at capacity (overflow is lost).
         currentLevel -= outflowVolumeMl;
         if (currentLevel > capacity) currentLevel = capacity;
 
-        return outflowLps;
+        return outflowVolumeMl / L_PER_S_TO_ML_PER_DAY;
     }
 
     void reset() {

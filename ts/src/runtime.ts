@@ -55,27 +55,22 @@ export class Dam {
     this.currentLevel = capacity * 0.5; // Start at 50% full
   }
 
+  // Outflow is a fixed daily volume (ML/day): normalRate below
+  // threshold, openRate at or above. Independent of inflow, matching
+  // how a real reservoir releases on a schedule.
   processFlow(inflowLps: number): number {
     const inflowVolumeMl = inflowLps * Dam.L_PER_S_TO_ML_PER_DAY;
     this.currentLevel += inflowVolumeMl;
 
-    let outflowLps: number;
-    if (this.currentLevel >= this.capacity * this.threshold) {
-      outflowLps = inflowLps * this.openRate;
-    } else {
-      outflowLps = inflowLps * this.normalRate;
-    }
-
-    let outflowVolumeMl = outflowLps * Dam.L_PER_S_TO_ML_PER_DAY;
-    if (outflowVolumeMl > this.currentLevel) {
-      outflowVolumeMl = this.currentLevel;
-      outflowLps = outflowVolumeMl / Dam.L_PER_S_TO_ML_PER_DAY;
-    }
+    let outflowVolumeMl = (this.currentLevel >= this.capacity * this.threshold)
+      ? this.openRate
+      : this.normalRate;
+    if (outflowVolumeMl > this.currentLevel) outflowVolumeMl = this.currentLevel;
 
     this.currentLevel -= outflowVolumeMl;
     if (this.currentLevel > this.capacity) this.currentLevel = this.capacity;
 
-    return outflowLps;
+    return outflowVolumeMl / Dam.L_PER_S_TO_ML_PER_DAY;
   }
 
   reset(): void {
@@ -104,6 +99,7 @@ export class RiverSystem {
   // Marker set by `compare` so per-mode validators know to soften their
   // requirements (the run is exploring a scenario, not the canonical one).
   scenarioRun = false;
+  unitLabels: Map<string, string> = new Map();
 
   // Markov state
   initialMass: Map<string, number> = new Map();

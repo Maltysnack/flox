@@ -30,9 +30,9 @@ river Murray1     { base: 2, peak: 1.0, decay: 0.8 }
 river UpperMurray { base: 5, peak: 2.5, decay: 0.7 }
 
 // Reservoirs
-dam EucumbeneDam { capacity: 4800, threshold: 75%, normalRate: 0.6, openRate: 1.3 }
-dam JindabyneDam { capacity: 700,  threshold: 80%, normalRate: 0.5, openRate: 1.5 }
-dam BloweringDam { capacity: 1600, threshold: 70%, normalRate: 0.8, openRate: 1.3 }
+dam EucumbeneDam { capacity: 4800, threshold: 75%, normalRate: 2,   openRate: 20 }
+dam JindabyneDam { capacity: 700,  threshold: 80%, normalRate: 0.3, openRate:  5 }
+dam BloweringDam { capacity: 1600, threshold: 70%, normalRate: 1,   openRate: 10 }
 
 outlet Murrumbidgee;
 outlet SnowyOutflow;

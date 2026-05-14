@@ -16,8 +16,8 @@ river jerrabombarra { base: 2, peak: 2.0 }
 river Queanbeyan { base: 3, peak: 1.5 }
 
 // Dams
-dam googongDam       { capacity: 1000, threshold: 80%, normalRate: 0.8, openRate: 1.2 }
-dam burleyGriffinDam { capacity: 5000, threshold: 60%, normalRate: 0.9, openRate: 1.5 }
+dam googongDam       { capacity: 1000, threshold: 80%, normalRate: 0.5, openRate:  5 }
+dam burleyGriffinDam { capacity: 5000, threshold: 60%, normalRate: 2,   openRate: 20 }
 
 // Outlets
 outlet centralMongolo;
