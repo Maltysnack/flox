@@ -1,0 +1,58 @@
+
+=== MARKOV CHAIN: PassThenShoot ===
+
+States (11):
+  Build0, Build1, Build2, Build3, Shoot0, Shoot1, Shoot2, Shoot3, Goal, Miss, Lost
+
+Transitions:
+  Build0 ─[0.7]─▶ Build1
+        └[0.1]─▶ Lost
+        └[0.2]─▶ Shoot0
+  Build1 ─[0.6]─▶ Build2
+        └[0.1]─▶ Lost
+        └[0.3]─▶ Shoot1
+  Build2 ─[0.5]─▶ Build3
+        └[0.1]─▶ Lost
+        └[0.4]─▶ Shoot2
+  Build3 ─[0.5]─▶ Lost
+        └[0.5]─▶ Shoot3
+  Shoot0 ─[0.1]─▶ Goal
+        └[0.9]─▶ Miss
+  Shoot1 ─[0.2]─▶ Goal
+        └[0.8]─▶ Miss
+  Shoot2 ─[0.3]─▶ Goal
+        └[0.7]─▶ Miss
+  Shoot3 ─[0.4]─▶ Goal
+        └[0.6]─▶ Miss
+
+Outgoing weights per state:
+  Build0 → 1.000  ✓
+  Build1 → 1.000  ✓
+  Build2 → 1.000  ✓
+  Build3 → 1.000  ✓
+  Shoot0 → 1.000  ✓
+  Shoot1 → 1.000  ✓
+  Shoot2 → 1.000  ✓
+  Shoot3 → 1.000  ✓
+  Goal absorbing
+  Miss absorbing
+  Lost absorbing
+
+
+=== MARKOV DISTRIBUTION: PassThenShoot (6 ticks, converged) ===
+
+Final distribution:
+  Build0  0.0000
+  Build1  0.0000
+  Build2  0.0000
+  Build3  0.0000
+  Shoot0  0.0000
+  Shoot1  0.0000
+  Shoot2  0.0000
+  Shoot3  0.0000
+  Goal    0.1544
+  Miss    0.5286
+  Lost    0.3170
+
+Total mass: 1.0000
+

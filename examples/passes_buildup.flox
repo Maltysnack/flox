@@ -1,0 +1,65 @@
+// PassThenShoot: the deeper football Markov. Where the simpler
+// PassOrShoot chain (passes.flox) treats every shot the same, this
+// model encodes the pass count as separate states, so shot quality
+// can rise with build-up.
+//
+// Each Build state represents how many passes have already happened.
+// From each Build state, the next action is one of:
+//   - pass again (advance to the next Build state)
+//   - lose possession (Lost)
+//   - shoot from here (a Shoot state matching the build count)
+//
+// Shot conversion improves with build-up: 10% from Shoot0, 40% from
+// Shoot3. After three passes the model forces a shot (no Build4):
+// players don't recycle indefinitely on the edge of the box.
+//
+// The question this model can answer that PassOrShoot can't: what's
+// the goal probability per possession across the full pipeline? Vary
+// the parameters to find the optimal build-up depth for given
+// turnover and conversion rates.
+mode markov;
+system PassThenShoot;
+
+// Possession with a build-up counter encoded in the state name.
+Build0 -[0.7]-> Build1;
+Build0 -[0.1]-> Lost;
+Build0 -[0.2]-> Shoot0;
+
+Build1 -[0.6]-> Build2;
+Build1 -[0.1]-> Lost;
+Build1 -[0.3]-> Shoot1;
+
+Build2 -[0.5]-> Build3;
+Build2 -[0.1]-> Lost;
+Build2 -[0.4]-> Shoot2;
+
+Build3 -[0.5]-> Lost;
+Build3 -[0.5]-> Shoot3;
+
+// Shots: conversion improves with build-up.
+Shoot0 -[0.10]-> Goal;   Shoot0 -[0.90]-> Miss;
+Shoot1 -[0.20]-> Goal;   Shoot1 -[0.80]-> Miss;
+Shoot2 -[0.30]-> Goal;   Shoot2 -[0.70]-> Miss;
+Shoot3 -[0.40]-> Goal;   Shoot3 -[0.60]-> Miss;
+
+// Build states
+node Build0;
+node Build1;
+node Build2;
+node Build3;
+
+// Shot states
+node Shoot0;
+node Shoot1;
+node Shoot2;
+node Shoot3;
+
+// Absorbing outcomes (no outgoing edges)
+node Goal;
+node Miss;
+node Lost;
+
+start Build0 1.0;
+
+map  PassThenShoot;
+print PassThenShoot 50;
