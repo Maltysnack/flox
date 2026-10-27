@@ -94,9 +94,11 @@ export class Interpreter {
         if (name === "river") this.fileMode = "river";
         else if (name === "markov") this.fileMode = "markov";
         else if (name === "grid") this.fileMode = "grid";
+        else if (name === "money") this.fileMode = "money";
+        else if (name === "settle") this.fileMode = "settle";
         else {
           throw new Error(
-            `Unknown mode '${name}' (line ${stmt.mode.line}). Known modes: river, markov, grid.`,
+            `Unknown mode '${name}' (line ${stmt.mode.line}). Known modes: river, markov, grid, money, settle.`,
           );
         }
         return;
@@ -151,6 +153,41 @@ export class Interpreter {
           );
         }
         sys.addRiver(new River(stmt.name.lexeme, 0, 0, 0.7, stmt.supply));
+        return;
+      }
+
+      case "MoneyDecl": {
+        if (this.phase !== Phase.COLLECT) return;
+        const sys = this.requireSystem(stmt.name);
+        if (sys.rivers.has(stmt.name.lexeme) || sys.dams.has(stmt.name.lexeme)) {
+          throw new Error(
+            `Node '${stmt.name.lexeme}' (line ${stmt.name.line}) is declared more than once in system '${sys.name}'.`,
+          );
+        }
+        // Register as a zero-flow River so existing iteration/topology
+        // works; keep the typed money fields in moneyMeta.
+        sys.addRiver(new River(stmt.name.lexeme, 0, 0, 0.7, 0));
+        sys.addMoneyMeta(stmt.name.lexeme, {
+          nodeType: stmt.nodeType,
+          amount: stmt.amount,
+          on: stmt.on,
+          balance: stmt.balance,
+          target: stmt.target,
+          spread: stmt.spread,
+        });
+        return;
+      }
+
+      case "PersonDecl": {
+        if (this.phase !== Phase.COLLECT) return;
+        const sys = this.requireSystem(stmt.name);
+        if (sys.rivers.has(stmt.name.lexeme) || sys.dams.has(stmt.name.lexeme)) {
+          throw new Error(
+            `Node '${stmt.name.lexeme}' (line ${stmt.name.line}) is declared more than once in system '${sys.name}'.`,
+          );
+        }
+        sys.addRiver(new River(stmt.name.lexeme, 0, 0, 0.7, 0));
+        sys.people.push(stmt.name.lexeme);
         return;
       }
 

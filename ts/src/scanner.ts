@@ -19,6 +19,11 @@ const KEYWORDS: Record<string, TokenType> = {
   as: TokenType.AS,
   with: TokenType.WITH,
   units: TokenType.UNITS,
+  income: TokenType.INCOME,
+  account: TokenType.ACCOUNT,
+  bill: TokenType.BILL,
+  pot: TokenType.POT,
+  person: TokenType.PERSON,
 };
 
 export class Scanner {

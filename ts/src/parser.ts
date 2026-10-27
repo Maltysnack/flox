@@ -14,8 +14,10 @@ import {
   ListStmt,
   MapStmt,
   ModeDecl,
+  MoneyDecl,
   NodeDecl,
   OutletDecl,
+  PersonDecl,
   PrintStmt,
   RiverDecl,
   StartStmt,
@@ -51,6 +53,11 @@ export class Parser {
       if (this.match(TokenType.DAM))    return this.damDeclaration();
       if (this.match(TokenType.OUTLET)) return this.outletDeclaration();
       if (this.match(TokenType.NODE))   return this.nodeDeclaration();
+      if (this.match(TokenType.INCOME))  return this.moneyDeclaration("income");
+      if (this.match(TokenType.ACCOUNT)) return this.moneyDeclaration("account");
+      if (this.match(TokenType.BILL))    return this.moneyDeclaration("bill");
+      if (this.match(TokenType.POT))     return this.moneyDeclaration("pot");
+      if (this.match(TokenType.PERSON))  return this.personDeclaration();
       if (this.match(TokenType.START))  return this.startStatement();
       if (this.match(TokenType.DISABLE)) return this.disableStatement();
       if (this.match(TokenType.COMPARE)) return this.compareStatement();
@@ -250,6 +257,33 @@ export class Parser {
     return { kind: "NodeDecl", name, supply };
   }
 
+  private moneyDeclaration(
+    nodeType: "income" | "account" | "bill" | "pot",
+  ): MoneyDecl {
+    const name = this.consume(TokenType.IDENTIFIER, `Expect ${nodeType} name.`);
+    const attrs = this.check(TokenType.LEFT_BRACE)
+      ? this.parseBlock(name)
+      : new Map<string, number>();
+    this.consumeOptional(TokenType.SEMICOLON);
+    this.validateAttrs(name, attrs, [], ["amount", "on", "balance", "target"]);
+    return {
+      kind: "MoneyDecl",
+      nodeType,
+      name,
+      amount: attrs.get("amount") ?? NaN,
+      on: attrs.get("on") ?? NaN,
+      balance: attrs.get("balance") ?? NaN,
+      target: attrs.get("target") ?? NaN,
+      spread: nodeType === "bill" && !attrs.has("on"),
+    };
+  }
+
+  private personDeclaration(): PersonDecl {
+    const name = this.consume(TokenType.IDENTIFIER, "Expect person name.");
+    this.consumeOptional(TokenType.SEMICOLON);
+    return { kind: "PersonDecl", name };
+  }
+
   private outletDeclaration(): OutletDecl {
     const name = this.consume(TokenType.IDENTIFIER, "Expect outlet name.");
     if (this.check(TokenType.LEFT_BRACE)) {
@@ -438,6 +472,11 @@ export class Parser {
         case TokenType.DAM:
         case TokenType.OUTLET:
         case TokenType.NODE:
+        case TokenType.INCOME:
+        case TokenType.ACCOUNT:
+        case TokenType.BILL:
+        case TokenType.POT:
+        case TokenType.PERSON:
         case TokenType.START:
         case TokenType.DISABLE:
         case TokenType.COMPARE:

@@ -1,0 +1,23 @@
+// June: a personal-budget cashflow over a 30-day timeline.
+// Income lands on payday, bills are drawn from Checking (some on a fixed
+// day, some spread evenly across the month), and a pot accrues savings.
+mode money;
+system June;
+
+Salary    -> Checking;
+Freelance -> Checking;
+Checking  -> Rent;
+Checking  -> Groceries;
+Checking  -> Utilities;
+Checking  -> Savings;
+
+income  Salary    { amount: 3200, on: 1 }
+income  Freelance { amount: 800,  on: 15 }
+account Checking  { balance: 1200 }
+bill    Rent      { amount: 1500, on: 1 }
+bill    Groceries { amount: 600 }            // no 'on' => spread evenly across the timeline
+bill    Utilities { amount: 220, on: 10 }
+pot     Savings   { target: 5000, amount: 400, on: 1 }
+
+map June;
+print June 30;     // simulate 30 days

@@ -1,0 +1,15 @@
+// SkiTrip: minimal debt settlement for a group. Each edge
+// 'From -[amt]-> To' means From owes To amt. Flox computes per-person net
+// balances and the minimal set of transfers that settles everyone up.
+mode settle;
+system SkiTrip;
+
+Bob   -[120]-> Alice;    // Bob owes Alice 120 (arrow points the way money should flow)
+Carol -[40]->  Bob;
+Alice -[80]->  Carol;
+Dave  -[60]->  Alice;
+
+person Alice; person Bob; person Carol; person Dave;
+
+map SkiTrip;
+print SkiTrip;           // no arg needed

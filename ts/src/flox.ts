@@ -22,7 +22,12 @@ export type NodeKind =
   | "state"      // markov-mode state
   | "generator"  // grid-mode supply > 0
   | "load"       // grid-mode supply < 0
-  | "relay";     // grid-mode supply == 0 with edges
+  | "relay"      // grid-mode supply == 0 with edges
+  | "income"     // money-mode income node
+  | "account"    // money-mode account node
+  | "bill"       // money-mode bill node
+  | "pot"        // money-mode pot node
+  | "person";    // settle-mode person node
 
 export interface GraphNode {
   name: string;
@@ -207,6 +212,18 @@ export function parseGraph(source: string): ParseGraphResult {
     }
   }
 
+  // For money-mode systems, run a default 30-day simulation so the
+  // renderer can show per-day balance series for accounts and pots.
+  for (const sys of interp.getSystems().values()) {
+    if (sys.mode !== "money") continue;
+    try {
+      sys.identifyRoots();
+      sys.simulateMoney(30);
+    } catch (_e) {
+      // leave series unset; renderer falls back to topology only
+    }
+  }
+
   const systems: SystemGraph[] = [];
   for (const sys of interp.getSystems().values()) {
     const graph = systemToGraph(sys);
@@ -221,15 +238,20 @@ export function parseGraph(source: string): ParseGraphResult {
 function systemToGraph(sys: RiverSystem): SystemGraph {
   const nodes: GraphNode[] = [];
   const isRiver = sys.mode === "river";
+  const isMoney = sys.mode === "money";
   for (const r of sys.rivers.values()) {
     const node: GraphNode = {
       name: r.name,
-      kind: classifyRiver(r, sys.mode),
+      kind: classifyNode(r, sys),
       supply: r.supply,
       disabled: sys.disabledNodes.has(r.name),
     };
     if (isRiver && r.dailyFlow && r.dailyFlow.length > 0) {
       node.series = r.dailyFlow.slice();
+    }
+    if (isMoney) {
+      const s = sys.moneySeries.get(r.name);
+      if (s && s.length > 0) node.series = s.slice();
     }
     nodes.push(node);
   }
@@ -265,13 +287,19 @@ function systemToGraph(sys: RiverSystem): SystemGraph {
   return { name: sys.name, mode: sys.mode, nodes, edges };
 }
 
-function classifyRiver(r: River, mode: Mode): NodeKind {
+function classifyNode(r: River, sys: RiverSystem): NodeKind {
+  const mode = sys.mode;
   if (mode === "grid") {
     if (r.supply > 0) return "generator";
     if (r.supply < 0) return "load";
     return "relay";
   }
   if (mode === "markov") return "state";
+  if (mode === "money") {
+    const meta = sys.moneyMeta.get(r.name);
+    return meta ? meta.nodeType : "relay";
+  }
+  if (mode === "settle") return "person";
   // river mode
   if (r.baseFlow === 0 && r.peakMultiplier === 0) return "outlet";
   return "river";

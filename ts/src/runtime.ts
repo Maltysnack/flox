@@ -78,7 +78,41 @@ export class Dam {
   }
 }
 
-export type Mode = "river" | "markov" | "grid";
+export type Mode = "river" | "markov" | "grid" | "money" | "settle";
+
+// Per-node typed metadata for money/settle modes. River nodes carry the
+// graph topology (so existing iteration/edges work); this map holds the
+// money/settle-specific fields keyed by node name.
+export interface MoneyMeta {
+  nodeType: "income" | "account" | "bill" | "pot";
+  amount: number; // NaN when absent
+  on: number;     // NaN when absent
+  balance: number; // NaN when absent
+  target: number;  // NaN when absent
+  spread: boolean;
+}
+
+export interface MoneyAccountSummary {
+  name: string;
+  start: number;
+  end: number;
+  low: number;
+  lowDay: number;
+  overdraft: boolean;
+}
+
+export interface MoneyPotSummary {
+  name: string;
+  start: number;
+  end: number;
+  target: number;
+}
+
+export interface SettleTransfer {
+  from: string;
+  to: string;
+  amount: number;
+}
 
 export interface Edge {
   target: string;
@@ -113,7 +147,24 @@ export class RiverSystem {
   gridTicksRun = 0;
   gridConverged = false;
 
+  // Money state
+  moneyMeta: Map<string, MoneyMeta> = new Map();
+  moneySeries: Map<string, number[]> = new Map(); // per-day balance, accounts + pots
+  moneyAccounts: MoneyAccountSummary[] = [];
+  moneyPots: MoneyPotSummary[] = [];
+  moneyDays = 0;
+  moneyOverdraft = false;
+
+  // Settle state
+  people: string[] = [];
+  settleNet: Map<string, number> = new Map();
+  settleTransfers: SettleTransfer[] = [];
+
   constructor(readonly name: string) {}
+
+  addMoneyMeta(name: string, meta: MoneyMeta): void {
+    this.moneyMeta.set(name, meta);
+  }
 
   addRiver(river: River): void {
     this.rivers.set(river.name, river);
@@ -330,6 +381,188 @@ export class RiverSystem {
       const c = edgeC.get(key)!;
       const flow = (this.gridLevel.get(ends[0])! - this.gridLevel.get(ends[1])!) * c;
       this.gridFlow.set(`${ends[0]}->${ends[1]}`, flow);
+    }
+  }
+
+  // Money-mode simulation. Days d = 1..N. Income deposits into the
+  // accounts it points to; bills are drawn from the accounts that point
+  // to them; pots receive transfers from the account that points to them.
+  // Builds a per-day balance series for every account and pot.
+  simulateMoney(days: number): void {
+    const N = Math.max(1, Math.round(days));
+    this.moneyDays = N;
+    this.moneySeries.clear();
+    this.moneyAccounts = [];
+    this.moneyPots = [];
+    this.moneyOverdraft = false;
+
+    const meta = this.moneyMeta;
+    const accounts: string[] = [];
+    const pots: string[] = [];
+    for (const [name, m] of meta) {
+      if (this.disabledNodes.has(name)) continue;
+      if (m.nodeType === "account") accounts.push(name);
+      else if (m.nodeType === "pot") pots.push(name);
+    }
+
+    // Running balances and per-day series (1-indexed by day; store N entries).
+    const balance = new Map<string, number>();
+    const series = new Map<string, number[]>();
+    const startBal = new Map<string, number>();
+    const low = new Map<string, number>();
+    const lowDay = new Map<string, number>();
+
+    for (const a of accounts) {
+      const b = Number.isNaN(meta.get(a)!.balance) ? 0 : meta.get(a)!.balance;
+      balance.set(a, b);
+      startBal.set(a, b);
+      series.set(a, new Array(N).fill(0));
+      low.set(a, Infinity);
+      lowDay.set(a, 1);
+    }
+    for (const p of pots) {
+      const b = Number.isNaN(meta.get(p)!.balance) ? 0 : meta.get(p)!.balance;
+      balance.set(p, b);
+      startBal.set(p, b);
+      series.set(p, new Array(N).fill(0));
+    }
+
+    // Helper: accounts that an income/pot node connects to, or accounts
+    // that connect into a bill node.
+    const targetsOf = (node: string): string[] => {
+      const outs = this.connections.get(node);
+      if (!outs) return [];
+      return outs
+        .filter(e => e.enabled && accounts.includes(e.target))
+        .map(e => e.target);
+    };
+    const sourcesInto = (node: string): string[] => {
+      const res: string[] = [];
+      for (const [from, edges] of this.connections) {
+        if (!accounts.includes(from)) continue;
+        for (const e of edges) {
+          if (e.enabled && e.target === node) { res.push(from); break; }
+        }
+      }
+      return res;
+    };
+
+    for (let day = 1; day <= N; day++) {
+      // Income deposits.
+      for (const [name, m] of meta) {
+        if (this.disabledNodes.has(name) || m.nodeType !== "income") continue;
+        const on = Number.isNaN(m.on) ? 1 : m.on;
+        if (on !== day) continue;
+        const amount = Number.isNaN(m.amount) ? 0 : m.amount;
+        const dests = targetsOf(name);
+        if (dests.length === 0) continue;
+        const each = amount / dests.length;
+        for (const a of dests) balance.set(a, balance.get(a)! + each);
+      }
+
+      // Bills (withdrawals).
+      for (const [name, m] of meta) {
+        if (this.disabledNodes.has(name) || m.nodeType !== "bill") continue;
+        const amount = Number.isNaN(m.amount) ? 0 : m.amount;
+        let due = 0;
+        if (m.spread) {
+          due = amount / N;
+        } else {
+          const on = Number.isNaN(m.on) ? 1 : m.on;
+          if (on === day) due = amount;
+        }
+        if (due === 0) continue;
+        const srcs = sourcesInto(name);
+        if (srcs.length === 0) continue;
+        const each = due / srcs.length;
+        for (const a of srcs) balance.set(a, balance.get(a)! - each);
+      }
+
+      // Pot transfers (account -> pot).
+      for (const [name, m] of meta) {
+        if (this.disabledNodes.has(name) || m.nodeType !== "pot") continue;
+        const on = Number.isNaN(m.on) ? 1 : m.on;
+        if (on !== day) continue;
+        const amount = Number.isNaN(m.amount) ? 0 : m.amount;
+        if (amount === 0) continue;
+        const srcs = sourcesInto(name);
+        if (srcs.length === 0) continue;
+        const each = amount / srcs.length;
+        for (const a of srcs) balance.set(a, balance.get(a)! - each);
+        balance.set(name, balance.get(name)! + amount);
+      }
+
+      // Snapshot balances for the day; track lows for accounts.
+      for (const a of accounts) {
+        const v = balance.get(a)!;
+        series.get(a)![day - 1] = v;
+        if (v < low.get(a)!) { low.set(a, v); lowDay.set(a, day); }
+        if (v < 0) this.moneyOverdraft = true;
+      }
+      for (const p of pots) {
+        series.get(p)![day - 1] = balance.get(p)!;
+      }
+    }
+
+    for (const [name, s] of series) this.moneySeries.set(name, s);
+    for (const a of accounts) {
+      const overdraft = low.get(a)! < 0;
+      this.moneyAccounts.push({
+        name: a,
+        start: startBal.get(a)!,
+        end: balance.get(a)!,
+        low: low.get(a)!,
+        lowDay: lowDay.get(a)!,
+        overdraft,
+      });
+    }
+    for (const p of pots) {
+      this.moneyPots.push({
+        name: p,
+        start: startBal.get(p)!,
+        end: balance.get(p)!,
+        target: Number.isNaN(meta.get(p)!.target) ? 0 : meta.get(p)!.target,
+      });
+    }
+  }
+
+  // Settle-mode: compute per-person net (owed - owes) from the declared
+  // debt edges, then greedily match the largest creditor with the largest
+  // debtor to produce a minimal set of transfers.
+  simulateSettle(): void {
+    this.settleNet.clear();
+    this.settleTransfers = [];
+
+    for (const p of this.people) this.settleNet.set(p, 0);
+
+    for (const [from, edges] of this.connections) {
+      for (const e of edges) {
+        if (!e.enabled) continue;
+        // from owes e.target: from is debtor (-), target is creditor (+).
+        if (this.settleNet.has(from)) {
+          this.settleNet.set(from, this.settleNet.get(from)! - e.weight);
+        }
+        if (this.settleNet.has(e.target)) {
+          this.settleNet.set(e.target, this.settleNet.get(e.target)! + e.weight);
+        }
+      }
+    }
+
+    // Greedy minimal settlement. Deterministic: sort by net then name.
+    const EPS = 1e-9;
+    const work = [...this.settleNet.entries()].map(([name, net]) => ({ name, net }));
+    const sortStable = () =>
+      work.sort((a, b) => (a.net - b.net) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+
+    while (true) {
+      sortStable();
+      const debtor = work[0]!;            // most negative
+      const creditor = work[work.length - 1]!; // most positive
+      if (creditor.net <= EPS || debtor.net >= -EPS) break;
+      const amount = Math.min(creditor.net, -debtor.net);
+      this.settleTransfers.push({ from: debtor.name, to: creditor.name, amount });
+      creditor.net -= amount;
+      debtor.net += amount;
     }
   }
 

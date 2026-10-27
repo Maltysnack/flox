@@ -12,6 +12,8 @@ export type AstNode =
   | DamDecl
   | OutletDecl
   | NodeDecl
+  | MoneyDecl
+  | PersonDecl
   | Chain
   | StartStmt
   | DisableStmt
@@ -54,6 +56,26 @@ export interface NodeDecl {
   readonly kind: "NodeDecl";
   readonly name: Token;
   readonly supply: number;
+}
+
+// money-mode declarations. One shape covers income/account/bill/pot;
+// fields default to NaN/false when absent so the runtime can tell "no on"
+// (NaN) from "on: 0".
+export interface MoneyDecl {
+  readonly kind: "MoneyDecl";
+  readonly nodeType: "income" | "account" | "bill" | "pot";
+  readonly name: Token;
+  readonly amount: number; // NaN when absent
+  readonly on: number;     // NaN when absent => spread / default day 1
+  readonly balance: number; // NaN when absent
+  readonly target: number;  // NaN when absent
+  readonly spread: boolean; // bill with no 'on' => spread across timeline
+}
+
+// settle-mode declaration: a person in the group.
+export interface PersonDecl {
+  readonly kind: "PersonDecl";
+  readonly name: Token;
 }
 
 export interface ChainEdge {

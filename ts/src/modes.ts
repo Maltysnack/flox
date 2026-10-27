@@ -12,6 +12,10 @@ import {
   printMap as printRiverMap,
   printMarkovDistribution,
   printMarkovMap,
+  printMoneyMap,
+  printMoneyResult,
+  printSettleMap,
+  printSettleResult,
 } from "./output.ts";
 import { Mode, RiverSystem } from "./runtime.ts";
 
@@ -135,10 +139,54 @@ const grid: ModeStrategy = {
   printResult(o, s, _arg) { printGridState(o, s); },
 };
 
+const money: ModeStrategy = {
+  validate(s, errs) {
+    const accounts = new Set<string>();
+    for (const [name, m] of s.moneyMeta) {
+      if (m.nodeType === "account") accounts.add(name);
+    }
+    // A node is connected to an account if it points to one (income/pot)
+    // or an account points to it (bill).
+    for (const [name, m] of s.moneyMeta) {
+      if (m.nodeType === "account") continue;
+      let connected = false;
+      const outs = s.connections.get(name);
+      if (outs) for (const e of outs) if (accounts.has(e.target)) { connected = true; break; }
+      if (!connected) {
+        for (const [from, edges] of s.connections) {
+          if (!accounts.has(from)) continue;
+          for (const e of edges) if (e.target === name) { connected = true; break; }
+          if (connected) break;
+        }
+      }
+      if (!connected) {
+        errs.push(
+          `Note: ${m.nodeType} '${name}' in budget '${s.name}' is not connected to any account.\n`,
+        );
+      }
+    }
+  },
+  run(s, arg) {
+    const days = arg.length > 0 ? arg[0]! : 30;
+    s.simulateMoney(days);
+  },
+  defaultArg() { return [30]; },
+  printMap(o, s) { printMoneyMap(o, s); },
+  printResult(o, s, _arg) { printMoneyResult(o, s); },
+};
+
+const settle: ModeStrategy = {
+  validate(_s, _errs) { /* no hard requirement */ },
+  run(s, _arg) { s.simulateSettle(); },
+  defaultArg() { return []; },
+  printMap(o, s) { printSettleMap(o, s); },
+  printResult(o, s, _arg) { printSettleResult(o, s); },
+};
+
 // Java prints "-100.0" for a whole double; mirror that in TS so the
 // stderr messages compare byte-identical across backends.
 function formatTotal(n: number): string {
   return Number.isInteger(n) ? n.toFixed(1) : String(n);
 }
 
-export const STRATEGIES: Record<Mode, ModeStrategy> = { river, markov, grid };
+export const STRATEGIES: Record<Mode, ModeStrategy> = { river, markov, grid, money, settle };

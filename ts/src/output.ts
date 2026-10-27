@@ -473,6 +473,133 @@ export function printGridState(o: Output, system: RiverSystem): void {
   o.println("");
 }
 
+export function printMoneyMap(o: Output, system: RiverSystem): void {
+  o.println("");
+  o.println("=== BUDGET: " + system.name + " ===\n");
+
+  let nameWidth = 4;
+  for (const n of system.moneyMeta.keys()) {
+    if (n.length > nameWidth) nameWidth = n.length;
+  }
+
+  o.println("Nodes (" + system.moneyMeta.size + "):");
+  for (const [name, m] of system.moneyMeta) {
+    let tag: string;
+    if (m.nodeType === "income") tag = "income   " + moneyFmt(m.amount);
+    else if (m.nodeType === "account") tag = "account  " + moneyFmt(Number.isNaN(m.balance) ? 0 : m.balance);
+    else if (m.nodeType === "bill") tag = "bill     " + moneyFmt(m.amount);
+    else tag = "pot      " + moneyFmt(m.amount) + " -> " + moneyFmt(m.target);
+    const suffix = system.disabledNodes.has(name) ? "  (disabled)" : "";
+    o.println("  " + padRight(name, nameWidth) + "  " + tag + suffix);
+  }
+  o.println("");
+
+  o.println("Routing:");
+  for (const [from, edges] of system.connections) {
+    for (const e of edges) {
+      o.println("  " + padRight(from, nameWidth) + " -> " + e.target);
+    }
+  }
+  o.println("");
+}
+
+export function printMoneyResult(o: Output, system: RiverSystem): void {
+  o.println("");
+  o.println(
+    "=== BUDGET: " + system.name + " (" + system.moneyDays + " days) ===\n",
+  );
+
+  let nameWidth = 8;
+  for (const a of system.moneyAccounts) nameWidth = Math.max(nameWidth, a.name.length);
+  for (const p of system.moneyPots) nameWidth = Math.max(nameWidth, p.name.length);
+
+  o.println("Accounts:");
+  for (const a of system.moneyAccounts) {
+    const flag = a.overdraft ? "  OVERDRAFT" : "";
+    o.println(
+      "  " + padRight(a.name, nameWidth) +
+      "  start " + moneyFmt(a.start) +
+      "  end " + moneyFmt(a.end) +
+      "  low " + moneyFmt(a.low) + " (day " + a.lowDay + ")" + flag,
+    );
+  }
+  o.println("");
+
+  if (system.moneyPots.length > 0) {
+    o.println("Pots:");
+    for (const p of system.moneyPots) {
+      const pct = p.target > 0 ? (p.end / p.target) * 100 : 0;
+      o.println(
+        "  " + padRight(p.name, nameWidth) +
+        "  start " + moneyFmt(p.start) +
+        "  end " + moneyFmt(p.end) +
+        "  target " + moneyFmt(p.target) +
+        "  (" + fmtFixed(pct, 1) + "%)",
+      );
+    }
+    o.println("");
+  }
+
+  o.println(system.moneyOverdraft
+    ? "Status: OVERDRAFT - an account went below zero."
+    : "Status: OK - no account went below zero.");
+  o.println("");
+}
+
+export function printSettleMap(o: Output, system: RiverSystem): void {
+  o.println("");
+  o.println("=== SETTLE: " + system.name + " ===\n");
+
+  o.println("People (" + system.people.length + "):");
+  o.println("  " + system.people.join(", "));
+  o.println("");
+
+  o.println("Debts:");
+  for (const [from, edges] of system.connections) {
+    for (const e of edges) {
+      o.println("  " + from + " owes " + e.target + " " + fmtFixed(e.weight, 2));
+    }
+  }
+  o.println("");
+}
+
+export function printSettleResult(o: Output, system: RiverSystem): void {
+  o.println("");
+  o.println("=== SETTLE: " + system.name + " ===\n");
+
+  let nameWidth = 4;
+  for (const p of system.people) nameWidth = Math.max(nameWidth, p.length);
+
+  o.println("Net balances (positive = owed, negative = owes):");
+  for (const p of system.people) {
+    o.println("  " + padRight(p, nameWidth) + "  " + settleSigned(system.settleNet.get(p) ?? 0));
+  }
+  o.println("");
+
+  o.println("Settlement:");
+  if (system.settleTransfers.length === 0) {
+    o.println("  (nothing to settle)");
+  } else {
+    for (const t of system.settleTransfers) {
+      o.println("  " + t.from + " pays " + t.to + " " + fmtFixed(t.amount, 2));
+    }
+  }
+  o.println("");
+  o.println("Transfers: " + system.settleTransfers.length);
+  o.println("");
+}
+
+function moneyFmt(v: number): string {
+  if (Number.isNaN(v)) return "-";
+  return fmtFixed(v, 2);
+}
+
+function settleSigned(v: number): string {
+  if (v > 0) return "+" + fmtFixed(v, 2);
+  if (v < 0) return fmtFixed(v, 2);
+  return " 0.00";
+}
+
 function signedFmt(v: number): string {
   if (v > 0) return "+" + fmtFixed(v, 2);
   if (v < 0) return fmtFixed(v, 2);
