@@ -31,6 +31,10 @@ re-vendors.
 - All committed (28-10-2026): portfolio-scope commit, then a
   separate commit for the money/settle prototype in `ts/src`,
   `ts/dist/flox.js` and its two examples.
+- `examples/showcase/grid.flox` fixed 28-10-2026: "Plant offline" was
+  unbalanced (sum -100), so `interpret` returned `hadError: true` and
+  garbage levels. Now also sets `Backup.supply = 130`; converges, no
+  stderr, TS and Java identical. Site must re-vendor it.
 - `flox-archive/` is untracked and intentionally left out.
 
 ## Known dead code (TS engine)
