@@ -12,6 +12,7 @@ class Dam {
     final double openRate;    // absolute outflow in ML/day, at or above threshold
     double currentLevel;      // ML
     double[] dailyOutflow;    // L/s, one entry per simulation day
+    double[] dailyLevel;      // ML held at the end of each day
 
     Dam(String name, double capacity, double threshold, double normalRate, double openRate) {
         this.name = name;
@@ -21,6 +22,7 @@ class Dam {
         this.openRate = openRate;
         this.currentLevel = capacity * 0.5; // Start at 50% full
         this.dailyOutflow = new double[10];
+        this.dailyLevel = new double[10];
     }
 
     // Process one day of inflow and return that day's outflow.

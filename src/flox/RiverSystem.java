@@ -273,6 +273,7 @@ class RiverSystem {
                 if (dam != null) {
                     flow = dam.processFlow(flow);
                     dam.dailyOutflow[day] = flow;
+                    dam.dailyLevel[day] = dam.currentLevel;
                 } else if (river != null) {
                     river.dailyFlow[day] = flow;
                     // Accumulate total for terminators

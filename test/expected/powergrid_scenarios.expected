@@ -8,7 +8,7 @@ Scenarios:
   Tie line cut    191 ticks, converged
 
                           Baseline  Plant offline  Backup boosted  Tie line cut
-Levels:
+Levels (power flows from high to low):
   Plant                     +21.67          (off)         +209.71        +21.67
   Backup                    +16.67        -753.96         +226.71        +16.67
   Hub                        +1.67        -781.46         +191.71         +1.67

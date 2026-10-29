@@ -65,19 +65,25 @@ three seconds. River comes second once the visitor is bought in and
 can absorb its richer vocabulary. Grid closes with the one feature
 worth flexing (scenarios).
 
-1. **Markov**. Source `examples/showcase/markov.flox`. `PassOrShoot`:
-   a footballer deciding to pass again or shoot, converging to a
-   goal/miss split over 200 ticks. Shows that arrows can carry
+1. **Markov**. Source `examples/showcase/markov.flox`. `Possession`:
+   a football team's ball moving between defence, midfield, attack,
+   shot and goal, every state reachable from every other. The chain
+   settles on how much of the game is spent in each state, which is
+   not obvious from the arrows. Shows that arrows can carry
    probabilities and the chain settles on its own. Dropped before:
    grid.
 
 2. **River** (the default mode). Source `examples/showcase/river.flox`.
-   A `Valley` system: two rivers, one dam, one outlet, a five-day
-   rainfall pulse. Shows the canonical use case and the per-day flow
-   table. Dropped last if space is tight: never.
+   A `Valley` system: two rivers, one dam, one outlet, two rain events.
+   Shows the canonical use case and the flow table: days as rows,
+   places as columns, every flow in ML/day so a node's inflows add up
+   to its own column, plus the dam's stored volume and the outlet's
+   running total in ML. Dropped last if space is tight: never.
 
-3. **Grid**. Source `examples/showcase/grid.flox`. `PowerGrid` with
-   `compare`: baseline, plant offline, tie line cut, side by side.
+3. **Grid**. Source `examples/showcase/grid.flox`. `Ring`: one plant
+   feeding three towns round a ring, compared under baseline, north
+   line cut and east line cut. Each cut forces power the long way
+   round; with the north line cut, the North to East line reverses.
    Shows the third mode and the one feature worth showing (scenarios).
    Dropped first if the page feels long.
 

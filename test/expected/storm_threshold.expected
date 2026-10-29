@@ -1,15 +1,21 @@
 
 === FLOW SIMULATION: Storm (100.0mm rainfall on day 1) ===
 
-(Flow values represent water volume per day in L/s)
+(Flows in ML/day. Held is water stored in a dam, total is water
+ delivered to the outlet so far, both in ML.)
 
-Location    |  Day  1   |  Day  2   |  Day  3   |  Day  4   |  Day  5   |  Day  6   |  Day  7   |  Day  8   |  Day  9   |  Day 10   |
-------------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|
-bigRain     |     305.0 |    1005.0 |     505.0 |     255.0 |     130.0 |      67.5 |      36.3 |      20.6 |      12.8 |       8.9 |
-reservoir   |     347.2 |     347.2 |     347.2 |     347.2 |     347.2 |      57.9 |      57.9 |      57.9 |      57.9 |      57.9 |
-------------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|
-Cumulative Outlet (converted to actual volume):
-sea [OUTLET]|   30.00ML |   60.00ML |   90.00ML |  120.00ML |  150.00ML |  155.00ML |  160.00ML |  165.00ML |  170.00ML |  175.00ML |
+Day  Rain mm  bigRain  reservoir  reservoir held    sea  sea total
+---  -------  -------  ---------  --------------  -----  ---------
+  1   100.00    26.35      30.00           21.35  30.00      30.00
+  2     0.00    86.83      30.00           50.00  30.00      60.00
+  3     0.00    43.63      30.00           50.00  30.00      90.00
+  4     0.00    22.03      30.00           42.03  30.00     120.00
+  5     0.00    11.23      30.00           23.26  30.00     150.00
+  6     0.00     5.83       5.00           24.10   5.00     155.00
+  7     0.00     3.13       5.00           22.23   5.00     160.00
+  8     0.00     1.78       5.00           19.01   5.00     165.00
+  9     0.00     1.11       5.00           15.12   5.00     170.00
+ 10     0.00     0.77       5.00           10.89   5.00     175.00
 
-Total water accumulated at outlet: 175.00 ML (megaliters)
+Total delivered to sea: 175.00 ML
 

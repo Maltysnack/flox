@@ -22,36 +22,25 @@ site repo. See `DISPLAY.md` Boundary.
   edges, river per-day `series`, and grid per-scenario `levels` and
   `flows`. Built for the removed playground; nothing renders it yet.
 
-## Feedback on the live panels (29-10-2026), not yet acted on
+## Panel feedback, acted on 29-10-2026
 
-River:
-- Units are incoherent: rainfall mm/day, flow "volume per day in L/s"
-  (self-contradictory header), outlet cumulative in ML. Nothing visibly
-  adds up. Proposed: one unit (ML/day) for every row so the rows sum to
-  the outlet total; show rainfall as its own row.
-- Table is 10 days wide and side-scrolls. User suggested cutting to 5
-  days, but that loses the recession (dam draining after rain), the
-  interesting part. Preferred: transpose (days as rows, places as
-  columns). This is an output format change: both backends + goldens.
-- Reservoir flat at 231.5 for days 2 to 7 reads like a bug; check.
-
-Markov:
-- `PassOrShoot` is trivial: Pass and Shoot are transient, so the result
-  is just Shoot's 10/90 split and the Pass loop is irrelevant. Needs an
-  ergodic example where the stationary split is non-obvious, e.g. a
-  possession cycle (defence, midfield, attack, shot, back to defence)
-  or weather.
-- Honest assessment: good notation for small chains, weak as a tool.
-  Only prints the final distribution; no hitting times, no transient
-  view. Its value on the page is readability plus (future) animation.
-- Unchecked: whether markov mode validates outgoing probabilities sum
-  to 1.
-
-Grid:
-- User does not understand it, and the example earns that. "Tie line
-  cut" equals Baseline (the line carried 0). "Plant offline" works only
-  because Backup.supply is hand-set to 130. Node "levels" have no
-  physical meaning. Rework so each scenario visibly reroutes, or drop.
+- River: flow table transposed (days as rows, places as columns),
+  every flow in ML/day, dams get a `<name> held` column (ML stored),
+  the outlet gets a running `<name> total`. All river goldens
+  regenerated. The flat Reservoir run was not a bug: the dam releases
+  openRate (20 ML/day) whenever that day's inflow takes it over 80%;
+  the held column now shows that. `units { flow: ... }` no longer
+  affects the river table.
+- Open: a dam over capacity after release silently loses the excess
+  (`currentLevel` clamped, no spill downstream). No showcase or
+  example hits it. Fix would be spilling into outflow.
+- Markov: showcase is now `Possession`, an ergodic five-state cycle.
+  Outgoing weights were already validated to sum to 1 (runtime error
+  with line numbers); `test/cases/err_markov_sum.flox` now pins it.
+  Still prints only the final distribution.
+- Grid: showcase is now `Ring`, one plant and three towns on a ring,
+  scenarios are two line cuts; the north cut reverses North to East.
+  Compare output labels levels "power flows from high to low".
 
 ## Visual renderer idea (thinking only, nothing built)
 

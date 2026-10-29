@@ -44,6 +44,7 @@ export class Dam {
 
   currentLevel: number;
   dailyOutflow: number[] = new Array(10).fill(0);
+  dailyLevel: number[] = new Array(10).fill(0); // ML held at the end of each day
 
   constructor(
     readonly name: string,
@@ -239,6 +240,7 @@ export class RiverSystem {
         if (dam) {
           flow = dam.processFlow(flow);
           dam.dailyOutflow[day] = flow;
+          dam.dailyLevel[day] = dam.currentLevel;
         } else if (river) {
           river.dailyFlow[day] = flow;
           if (river.isTerminator()) river.totalAccumulated += flow;

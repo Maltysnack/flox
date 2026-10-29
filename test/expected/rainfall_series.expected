@@ -1,14 +1,21 @@
 
 === FLOW SIMULATION: SeriesDemo (rainfall mm/day: [0, 1, 30, 10, 0, 0, 0]) ===
 
-(Flow values represent water volume per day in L/s)
+(Flows in ML/day. Held is water stored in a dam, total is water
+ delivered to the outlet so far, both in ML.)
 
-Location       |  Day  1   |  Day  2   |  Day  3   |  Day  4   |  Day  5   |  Day  6   |  Day  7   |  Day  8   |  Day  9   |  Day 10   |
----------------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|
-Spring         |       2.0 |       2.6 |      22.0 |      69.4 |      65.0 |      46.1 |      32.9 |      23.6 |      17.1 |      12.6 |
----------------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|
-Cumulative Outlet (converted to actual volume):
-Outlet [OUTLET]|  172.80KL |  397.44KL |    2.30ML |    8.29ML |   13.91ML |   17.89ML |   20.73ML |   22.77ML |   24.25ML |   25.34ML |
+Day  Rain mm  Spring  Outlet  Outlet total
+---  -------  ------  ------  ------------
+  1     0.00    0.17    0.17          0.17
+  2     1.00    0.22    0.22          0.40
+  3    30.00    1.90    1.90          2.30
+  4    10.00    6.00    6.00          8.29
+  5     0.00    5.61    5.61         13.91
+  6     0.00    3.98    3.98         17.89
+  7     0.00    2.84    2.84         20.73
+  8     0.00    2.04    2.04         22.77
+  9     0.00    1.48    1.48         24.25
+ 10     0.00    1.09    1.09         25.34
 
-Total water accumulated at outlet: 25.34 ML (megaliters)
+Total delivered to Outlet: 25.34 ML
 

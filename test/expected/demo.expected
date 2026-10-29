@@ -13,16 +13,21 @@ Tributary (source)
 
 === FLOW SIMULATION: Demo (5.0mm rainfall on day 1) ===
 
-(Flow values represent water volume per day in L/s)
+(Flows in ML/day. Held is water stored in a dam, total is water
+ delivered to the outlet so far, both in ML.)
 
-Location       |  Day  1  |  Day  2  |  Day  3  |  Day  4  |  Day  5  |  Day  6  |  Day  7  |  Day  8  |  Day  9  |  Day 10  |
----------------|----------|----------|----------|----------|----------|----------|----------|----------|----------|----------|
-Spring         |      5.0 |     12.0 |      9.0 |      6.9 |      5.4 |      4.4 |      3.7 |      3.2 |      2.8 |      2.6 |
-Tributary      |      3.3 |      8.5 |      5.5 |      3.7 |      2.6 |      2.0 |      1.6 |      1.3 |      1.2 |      1.1 |
-Confluence     |     14.0 |     32.5 |     23.8 |     18.0 |     14.1 |     11.5 |      9.8 |      8.6 |      7.8 |      7.2 |
----------------|----------|----------|----------|----------|----------|----------|----------|----------|----------|----------|
-Cumulative Outlet (converted to actual volume):
-Outlet [OUTLET]|   1.21ML |   4.01ML |   6.07ML |   7.63ML |   8.85ML |   9.84ML |  10.69ML |  11.43ML |  12.10ML |  12.73ML |
+Day  Rain mm  Spring  Tributary  Confluence  Outlet  Outlet total
+---  -------  ------  ---------  ----------  ------  ------------
+  1     5.00    0.43       0.28        1.21    1.21          1.21
+  2     0.00    1.04       0.73        2.81    2.81          4.01
+  3     0.00    0.78       0.48        2.06    2.06          6.07
+  4     0.00    0.60       0.32        1.56    1.56          7.63
+  5     0.00    0.47       0.23        1.22    1.22          8.85
+  6     0.00    0.38       0.17        1.00    1.00          9.84
+  7     0.00    0.32       0.14        0.84    0.84         10.69
+  8     0.00    0.27       0.12        0.74    0.74         11.43
+  9     0.00    0.24       0.10        0.67    0.67         12.10
+ 10     0.00    0.22       0.10        0.62    0.62         12.73
 
-Total water accumulated at outlet: 12.73 ML (megaliters)
+Total delivered to Outlet: 12.73 ML
 
