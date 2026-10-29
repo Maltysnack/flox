@@ -1,17 +1,24 @@
 # Display brief: Flox
 
-This file is the contract between the Flox repo and the site repo. It
-is the only Flox file the site repo decides anything about.
+This file is the contract between the Flox repo and the site repo.
 
 ## Boundary
 
-Flox is controlled entirely from this repo (`Maltysnack/flox`). The
-site repo (`Maltysnack.github.io`) is a dumb renderer: it reads this
-brief and the three assets named below, and it never originates,
-versions, or edits Flox content, UI, or behaviour.
+Work on Flox is led from the site repo (`Maltysnack.github.io`),
+because the live page is the point of the project. The agent working
+there decides what the page needs and makes the matching changes in
+this repo directly: engine, showcase programs, and this brief.
 
-If the site needs something, this brief changes first and the site
-rebuilds against it. The site never adds Flox files of its own.
+Ownership of files does not move. Engine code, showcase sources and
+this brief still live here, and every change to them follows this
+repo's `CLAUDE.md` (both backends, byte-identical goldens, rebuild
+`ts/dist/flox.js`). The site still never keeps Flox files of its own
+beyond the vendored copies listed below; a renderer or any other
+Flox logic is written here and vendored like the engine.
+
+Order of work for a page change: update this brief, change and test
+the engine or showcase here, commit here, then re-vendor and rebuild
+the page in the site repo.
 
 ## What the site reads from this repo
 

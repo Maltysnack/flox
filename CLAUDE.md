@@ -22,6 +22,10 @@
 - `test/test.sh` (Java) and `ts/test/test.sh` (TS) run the golden suite.
 - The website's Flox page is `/Users/milo/Documents/Maltysnack.github.io/projects/flox/`, a single page of live examples (the playground and docs routes were removed 23-10-2026). After a rebuild, copy `ts/dist/flox.js` to `projects/flox/flox.js` there. Page changes are made in that repo, not here.
 
+## Who leads
+
+Flox work is driven from the site repo's sessions (see `DISPLAY.md` Boundary). An agent arriving from there edits this repo directly but must follow every rule in this file: read `handoff.md`, keep Java and TS byte-identical, run both test suites, rebuild `ts/dist/flox.js`, commit here before re-vendoring.
+
 ## Commands
 
 - Java tests: `bash test/test.sh`

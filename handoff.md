@@ -3,78 +3,83 @@
 ## Where Flox is
 
 Finished small portfolio piece. One grammar, three modes (markov,
-river, grid), two backends (Java + TS), byte-identical goldens
-(25/25), live editable page on the portfolio site. Not building
-toward anything bigger. No cloud, no accounts, no roadmap.
+river, grid), two backends (Java + TS), byte-identical goldens,
+live editable page on the portfolio site. No cloud, no accounts.
 
-## Boundary rule
+## Process (changed 29-10-2026)
 
-Flox is controlled entirely from this repo. The site repo
-(`Maltysnack.github.io`) is a dumb renderer and originates nothing.
-It reads exactly three things from here, verbatim:
+Work is now led from the site repo (`Maltysnack.github.io`). That
+repo's agent decides what the page needs and edits this repo directly,
+following `CLAUDE.md` here. Files still live where they did: engine,
+showcase programs and `DISPLAY.md` in this repo; page shell in the
+site repo. See `DISPLAY.md` Boundary.
 
-1. `DISPLAY.md` (structure, copy, panel order, voice)
-2. `ts/dist/flox.js` (the engine, one ES module)
-3. `examples/showcase/{markov,river,grid}.flox` (panel programs)
+## State of this repo
 
-If a Flox change is needed, DISPLAY.md changes first and the site
-re-vendors.
+- All committed. `flox-archive/` is untracked on purpose.
+- `examples/showcase/{markov,river,grid}.flox` are the panel sources.
+- `parseGraph(source)` in `ts/src/flox.ts` already returns nodes,
+  edges, river per-day `series`, and grid per-scenario `levels` and
+  `flows`. Built for the removed playground; nothing renders it yet.
 
-## This repo's state
+## Feedback on the live panels (29-10-2026), not yet acted on
 
-- `DISPLAY.md` is current: markov leads, hookier headline, "one
-  parser, three simulators" line up front.
-- `examples/showcase/` has the three canonical panel files.
-- `README.md` is stripped to portfolio scope. No milestones, no
-  pricing, no cloud. Points at DISPLAY.md.
-- `docs/flox-cloud-spec.md` is deleted.
-- All committed (28-10-2026): portfolio-scope commit, then a
-  separate commit for the money/settle prototype in `ts/src`,
-  `ts/dist/flox.js` and its two examples.
-- `examples/showcase/grid.flox` fixed 28-10-2026: "Plant offline" was
-  unbalanced (sum -100), so `interpret` returned `hadError: true` and
-  garbage levels. Now also sets `Backup.supply = 130`; converges, no
-  stderr, TS and Java identical. Site must re-vendor it.
-- `flox-archive/` is untracked and intentionally left out.
+River:
+- Units are incoherent: rainfall mm/day, flow "volume per day in L/s"
+  (self-contradictory header), outlet cumulative in ML. Nothing visibly
+  adds up. Proposed: one unit (ML/day) for every row so the rows sum to
+  the outlet total; show rainfall as its own row.
+- Table is 10 days wide and side-scrolls. User suggested cutting to 5
+  days, but that loses the recession (dam draining after rain), the
+  interesting part. Preferred: transpose (days as rows, places as
+  columns). This is an output format change: both backends + goldens.
+- Reservoir flat at 231.5 for days 2 to 7 reads like a bug; check.
+
+Markov:
+- `PassOrShoot` is trivial: Pass and Shoot are transient, so the result
+  is just Shoot's 10/90 split and the Pass loop is irrelevant. Needs an
+  ergodic example where the stationary split is non-obvious, e.g. a
+  possession cycle (defence, midfield, attack, shot, back to defence)
+  or weather.
+- Honest assessment: good notation for small chains, weak as a tool.
+  Only prints the final distribution; no hitting times, no transient
+  view. Its value on the page is readability plus (future) animation.
+- Unchecked: whether markov mode validates outgoing probabilities sum
+  to 1.
+
+Grid:
+- User does not understand it, and the example earns that. "Tie line
+  cut" equals Baseline (the line carried 0). "Plant offline" works only
+  because Backup.supply is hand-set to 130. Node "levels" have no
+  physical meaning. Rework so each scenario visibly reroutes, or drop.
+
+## Visual renderer idea (thinking only, nothing built)
+
+Goal: draw each system and animate it instead of only printing a table.
+- 2D SVG, not three.js. Under 10 nodes; dots moving along edges.
+- River: top to bottom by downstream depth, edge width by flow, day
+  play/scrub, dam fill gauge, outlet filling.
+- Markov: nodes on a circle, edge thickness by probability, a token
+  hopping per tick, bars converging. Needs a new per-tick distribution
+  series from the engine (parseGraph has river series only).
+- Grid: dots at speed proportional to flow; scenario toggle buttons
+  instead of three columns.
+- Layout: layer by topological depth; dagre only if that fails.
+- Editing: start one-way (code to picture). Then drag nodes (easy),
+  drag a weight that rewrites the number in the source (moderate),
+  draw nodes/edges with two-way sync (hard).
+- Renderer is Flox logic, so it is written in this repo as a second
+  vendored module and named in `DISPLAY.md`.
 
 ## Known dead code (TS engine)
 
-Prototype `money` and `settle` modes added by a previous session
-across `ts/src/{modes,interpreter,parser,scanner,ast,token,output,
-runtime,flox}.ts`, plus `examples/money_budget.flox` and
-`examples/settle_trip.flox`. DISPLAY.md forbids surfacing them, so
-they are invisible on the page but still ship in `flox.js`. Prune
-when the prototype is confirmed dead. Java backend was never ported;
-no parity work needed on removal.
+Prototype `money` and `settle` modes across `ts/src/*`, plus
+`examples/money_budget.flox` and `examples/settle_trip.flox`. Hidden
+from the page by `DISPLAY.md` but shipped in `flox.js`. Prune when
+confirmed dead. Never ported to Java.
 
-## Work pending in the SITE repo (not this one)
+## Unrelated feedback (not Flox)
 
-Another session owns these; do not touch from here.
-
-- Rebuild `projects/flox/index.html` against the current `DISPLAY.md`:
-  new headline, positioning line, three panels in the new order
-  (markov, river, grid), each loaded verbatim from
-  `examples/showcase/*.flox`. Drop the current fourth "creek" panel.
-  Re-vendor `ts/dist/flox.js`.
-- Delete every Flox Cloud leftover (playground/cloud/, gallery/,
-  cloud/schema.sql, cloud/SPEC.md, GO-LIVE.md, api/flox-*.js, and
-  any toolbar/`window.FloxPlayground`/`flox-ready` wiring in
-  index.html). Check actual uncommitted state first; the list above
-  is from an older handoff and may be stale.
-
-## Unrelated feedback (NOT Flox, do not act on here)
-
-User mentioned issues on a separate algorithms visualisation page
-on the site (A* pathfinding, 15-puzzle, ant colony). None of these
-are Flox. Routed to whoever owns that project:
-
-- A*: "New run" resets the algorithm selection; read dropdown at
-  click time.
-- 15-puzzle: no rules shown; add tooltip or Wikipedia link.
-- Ant colony: too fast to follow; no way to add custom points;
-  feels preplanned. Add speed slider + click-to-plant cities.
-
-## Pending
-
-- Site session: rebuild page + delete Cloud leftovers.
-- Prune money/settle TS code when confirmed dead.
+Algorithms visualisation page on the site: A* "New run" resets the
+algorithm selection; 15-puzzle shows no rules; ant colony too fast,
+no custom points. Belongs to that project.
