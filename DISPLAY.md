@@ -10,8 +10,8 @@ there decides what the page needs and makes the matching changes in
 this repo directly: engine, showcase programs, and this brief.
 
 Ownership of files does not move. Engine code, showcase sources and
-this brief still live here, and every change to them follows this
-repo's `CLAUDE.md` (both backends, byte-identical goldens, rebuild
+this brief still live here, and every change to them follows the
+Development rules in `README.md` (both backends, byte-identical goldens, rebuild
 `ts/dist/flox.js`). The site still never keeps Flox files of its own
 beyond the vendored copies listed below; a renderer or any other
 Flox logic is written here and vendored like the engine.

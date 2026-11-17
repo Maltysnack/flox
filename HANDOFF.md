@@ -9,8 +9,10 @@ live editable page on the portfolio site. No cloud, no accounts.
 ## Process (changed 29-10-2026)
 
 Work is now led from the site repo (`Maltysnack.github.io`). That
-repo's agent decides what the page needs and edits this repo directly,
-following `CLAUDE.md` here. Files still live where they did: engine,
+repo decides what the page needs and edits this repo directly, following
+the Development rules in `README.md` (both test suites pass, Java and TS
+byte-identical, rebuild `ts/dist/flox.js`, commit here before
+re-vendoring). Files still live where they did: engine,
 showcase programs and `DISPLAY.md` in this repo; page shell in the
 site repo. See `DISPLAY.md` Boundary.
 
@@ -66,9 +68,3 @@ Prototype `money` and `settle` modes across `ts/src/*`, plus
 `examples/money_budget.flox` and `examples/settle_trip.flox`. Hidden
 from the page by `DISPLAY.md` but shipped in `flox.js`. Prune when
 confirmed dead. Never ported to Java.
-
-## Unrelated feedback (not Flox)
-
-Algorithms visualisation page on the site: A* "New run" resets the
-algorithm selection; 15-puzzle shows no rules; ant colony too fast,
-no custom points. Belongs to that project.
