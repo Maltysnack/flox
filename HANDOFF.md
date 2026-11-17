@@ -55,8 +55,8 @@ Goal: draw each system and animate it instead of only printing a table.
 - Editing: start one-way (code to picture). Then drag nodes (easy),
   drag a weight that rewrites the number in the source (moderate),
   draw nodes/edges with two-way sync (hard).
-- Renderer is Flox logic, so it is written in this repo as a second
-  module in this repo, named in `DISPLAY.md`.
+- Renderer is Flox logic, so it is a second module in this repo,
+  named in `DISPLAY.md`.
 
 ## Known dead code (TS engine)
 
