@@ -5,8 +5,8 @@ This file is the brief for the live page.
 ## Boundary
 
 The page lives in this repo: `index.html` at the root, with its
-stylesheet and top bar in `page/`. GitHub Pages serves the repo root
-at maltysnack.github.io/flox/. The portfolio site only links here.
+stylesheet in `page/`. GitHub Pages serves the repo root
+at maltysnack.github.io/flox/. The portfolio site links here; this page links nowhere else.
 
 Order of work for a page change: update this brief, change and test
 the engine or showcase following the Development rules in `README.md`
