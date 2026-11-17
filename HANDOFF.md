@@ -4,17 +4,13 @@
 
 Finished small portfolio piece. One grammar, three modes (markov,
 river, grid), two backends (Java + TS), byte-identical goldens,
-live editable page on the portfolio site. No cloud, no accounts.
+live editable page at maltysnack.github.io/flox/. No cloud, no accounts.
 
-## Process (changed 29-10-2026)
+## Process (changed 17-11-2026)
 
-Work is now led from the site repo (`Maltysnack.github.io`). That
-repo decides what the page needs and edits this repo directly, following
-the Development rules in `README.md` (both test suites pass, Java and TS
-byte-identical, rebuild `ts/dist/flox.js`, commit here before
-re-vendoring). Files still live where they did: engine,
-showcase programs and `DISPLAY.md` in this repo; page shell in the
-site repo. See `DISPLAY.md` Boundary.
+The live page now lives in this repo (`index.html`, `page/`), served by
+GitHub Pages from the repo root. Follow the Development rules in
+`README.md` and `DISPLAY.md`; no other repo is involved.
 
 ## State of this repo
 
@@ -60,7 +56,7 @@ Goal: draw each system and animate it instead of only printing a table.
   drag a weight that rewrites the number in the source (moderate),
   draw nodes/edges with two-way sync (hard).
 - Renderer is Flox logic, so it is written in this repo as a second
-  vendored module and named in `DISPLAY.md`.
+  module in this repo, named in `DISPLAY.md`.
 
 ## Known dead code (TS engine)
 

@@ -4,7 +4,7 @@ A small language for **flow networks**. You write nodes and arrows, and
 it simulates how something moves through them over time.
 
 Try it live at
-[maltysnack.github.io/projects/flox](https://maltysnack.github.io/projects/flox/).
+[maltysnack.github.io/flox](https://maltysnack.github.io/flox/).
 
 Its scanner, parser and tree-walking interpreter follow the design of
 Robert Nystrom's [*Crafting Interpreters*](https://craftinginterpreters.com/).

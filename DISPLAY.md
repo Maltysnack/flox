@@ -1,36 +1,23 @@
 # Display brief: Flox
 
-This file is the contract between the Flox repo and the site repo.
+This file is the brief for the live page.
 
 ## Boundary
 
-Work on Flox is led from the site repo (`Maltysnack.github.io`),
-because the live page is the point of the project. The agent working
-there decides what the page needs and makes the matching changes in
-this repo directly: engine, showcase programs, and this brief.
-
-Ownership of files does not move. Engine code, showcase sources and
-this brief still live here, and every change to them follows the
-Development rules in `README.md` (both backends, byte-identical goldens, rebuild
-`ts/dist/flox.js`). The site still never keeps Flox files of its own
-beyond the vendored copies listed below; a renderer or any other
-Flox logic is written here and vendored like the engine.
+The page lives in this repo: `index.html` at the root, with its
+stylesheet and top bar in `page/`. GitHub Pages serves the repo root
+at maltysnack.github.io/flox/. The portfolio site only links here.
 
 Order of work for a page change: update this brief, change and test
-the engine or showcase here, commit here, then re-vendor and rebuild
-the page in the site repo.
+the engine or showcase following the Development rules in `README.md`
+(both backends, byte-identical goldens, rebuild `ts/dist/flox.js`),
+then commit. The page picks up the new engine and showcase directly.
 
-## What the site reads from this repo
+## What the page reads
 
-Only these:
-
-1. This file (`DISPLAY.md`) for structure and copy.
-2. `ts/dist/flox.js` for the engine.
-3. `examples/showcase/river.flox`, `markov.flox`, `grid.flox` for the
+1. `ts/dist/flox.js` for the engine.
+2. `examples/showcase/river.flox`, `markov.flox`, `grid.flox` for the
    three panels' program text, verbatim.
-
-Nothing else. The site vendors them on each rebuild; it does not
-modify them.
 
 ## The point
 
@@ -102,17 +89,12 @@ line each). Nothing else.
 
 ## Data contract
 
-- **Engine**: `ts/dist/flox.js` from this repo, one ES module. Exports
+- **Engine**: `ts/dist/flox.js`, one ES module. Exports
   `interpret(source)` returning `{ stdout, stderr, hadError }`.
-- **Example sources**: the three files in `examples/showcase/` from
-  this repo, read verbatim into the page as the initial program text.
-  No trimming, no edits, no site-side rewrites.
-- **Update cadence**: this repo rebuilds the engine and updates the
-  showcase files when they change; the site re-vendors on its next
-  rebuild. There is no runtime fetch and no cross-repo link.
-- **Who writes**: this repo owns the engine, the showcase sources, and
-  this brief. The site owns only the page shell: layout, styling, the
-  editor textarea, the rerun loop.
+- **Example sources**: the three files in `examples/showcase/`, fetched
+  verbatim as the initial program text. No trimming, no edits.
+- **Page shell**: `index.html` and `page/` own layout, styling, the
+  editor textarea and the rerun loop, nothing else.
 
 ## Voice
 
