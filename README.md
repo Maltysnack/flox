@@ -3,6 +3,15 @@
 A small language for **flow networks**. You write nodes and arrows, and
 it simulates how something moves through them over time.
 
+Try it live at
+[maltysnack.github.io/projects/flox](https://maltysnack.github.io/projects/flox/).
+
+Its scanner, parser and tree-walking interpreter follow the design of
+Robert Nystrom's [*Crafting Interpreters*](https://craftinginterpreters.com/).
+I designed, directed and tested Flox, and built it with Claude Code as my
+development tool. Java reference implementation, with a TypeScript port
+for the browser.
+
 One grammar, three modes:
 
 - `river` (default): water through rivers, dams and outlets, driven by
@@ -62,9 +71,19 @@ simulators, in about two thousand lines across Java and TypeScript.
 A sketching tool for the shape of a system, not a hydrology engine or
 a power-flow solver.
 
-The TypeScript build powers the live page at
-[maltysnack.github.io/projects/flox](https://maltysnack.github.io/projects/flox/).
-See [`DISPLAY.md`](DISPLAY.md) for the brief that page follows.
+The TypeScript build powers the live page. See [`DISPLAY.md`](DISPLAY.md)
+for the brief that page follows.
+
+## Development
+
+```sh
+bash test/test.sh             # Java golden tests
+bash test/test.sh --update    # regenerate golden files
+bash ts/test/test.sh          # TypeScript golden tests
+cd ts && npm run build        # bundle ts/dist/flox.js
+```
+
+Both backends must produce byte-identical output.
 
 ## Working principles
 
